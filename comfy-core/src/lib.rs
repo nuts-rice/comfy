@@ -17,8 +17,6 @@ mod global_state;
 mod hot_reload;
 mod input;
 mod lighting;
-#[cfg(feature = "lua")]
-mod lua_export;
 mod math;
 mod perf_counters;
 mod quad;
@@ -45,8 +43,6 @@ pub use crate::global_state::*;
 pub use crate::hot_reload::*;
 pub use crate::input::*;
 pub use crate::lighting::*;
-#[cfg(feature = "lua")]
-pub use crate::lua_export::*;
 pub use crate::math::*;
 pub use crate::perf_counters::*;
 pub use crate::quad::*;
@@ -193,6 +189,7 @@ pub use lazy_static::lazy_static;
 pub use ordered_float::OrderedFloat;
 
 pub use comfy_color_backtrace as color_backtrace;
+#[cfg(feature = "git-version")]
 pub use comfy_git_version as git_version;
 pub use comfy_include_dir as include_dir;
 
@@ -1015,9 +1012,6 @@ pub trait Vec2Extensions {
     fn as_transform(&self) -> Transform;
     fn egui(&self) -> egui::Vec2;
     fn egui_pos(&self) -> egui::Pos2;
-
-    #[cfg(feature = "lua")]
-    fn lua(&self) -> LuaVec2;
 }
 
 impl Vec2Extensions for Vec2 {
@@ -1058,11 +1052,6 @@ impl Vec2Extensions for Vec2 {
     fn egui_pos(&self) -> egui::Pos2 {
         egui::pos2(self.x, self.y)
     }
-
-    #[cfg(feature = "lua")]
-    fn lua(&self) -> LuaVec2 {
-        LuaVec2(*self)
-    }
 }
 
 // pub trait ColorExtensions {
@@ -1090,7 +1079,8 @@ impl std::fmt::Display for SemanticVer {
 #[macro_export]
 macro_rules! define_versions {
     () => {
-        // pub const GIT_VERSION: &str = git_version::git_version!();
+        #[cfg(feature = "git-version")]
+        pub const GIT_VERSION: &str = git_version::git_version!();
 
         $crate::lazy_static! {
             pub static ref VERSION: $crate::SemanticVer = $crate::SemanticVer {
@@ -1100,6 +1090,7 @@ macro_rules! define_versions {
             };
         }
 
+        #[cfg(not(feature = "git-version"))]
         pub fn version_str() -> &'static str {
             concat!(
                 "v",
@@ -1108,9 +1099,21 @@ macro_rules! define_versions {
                 env!("CARGO_PKG_VERSION_MINOR"),
                 ".",
                 env!("CARGO_PKG_VERSION_PATCH"),
-                // "(",
-                // git_version::git_version!(),
-                // ")"
+            )
+        }
+
+        #[cfg(feature = "git-version")]
+        pub fn version_str() -> &'static str {
+            concat!(
+                "v",
+                env!("CARGO_PKG_VERSION_MAJOR"),
+                ".",
+                env!("CARGO_PKG_VERSION_MINOR"),
+                ".",
+                env!("CARGO_PKG_VERSION_PATCH"),
+                " (",
+                git_version::git_version!(),
+                ")"
             )
         }
     };
