@@ -1,6 +1,7 @@
 # EXAMPLE=animated_shapes
 # EXAMPLE=animated_text
 # EXAMPLE=animated_sprites
+# EXAMPLE=alpha_sprite
 # EXAMPLE=blood_canvas
 # EXAMPLE=bloom
 # EXAMPLE=custom_config
@@ -12,18 +13,20 @@
 # EXAMPLE=ecs_topdown_game
 # EXAMPLE=full_game_loop
 # EXAMPLE=framerate_vsync
+# EXAMPLE=fragment-shader
 # EXAMPLE=music
 # EXAMPLE=lighting
-# EXAMPLE=single_particle
+EXAMPLE=single_particle
 # EXAMPLE=particle_systems
 # EXAMPLE=physics
 # EXAMPLE=post_processing
+# EXAMPLE=render-target
 # EXAMPLE=sprite
 # EXAMPLE=shapes
 # EXAMPLE=sound
 # EXAMPLE=text
 # EXAMPLE=timed_draw
-EXAMPLE=version
+# EXAMPLE=version
 # EXAMPLE=y_sort
 
 # default: build-examples
@@ -31,10 +34,11 @@ EXAMPLE=version
 # default: profile-startup
 # default: bitmob
 default: example
+# default: lint
 # default: test
 
-FLAGS=--features=blobs,git-version
-ENV_VARS=RUST_LOG=warn,wgpu=info,symphonia=warn,naga=warn RUST_BACKTRACE=1
+FLAGS=--features=blobs,git-version,dev
+ENV_VARS=RUST_LOG=info,wgpu=warn,symphonia=warn,naga=warn RUST_BACKTRACE=1
 
 bitmob:
 	$(ENV_VARS) cargo run --bin bitmob $(FLAGS)
@@ -47,6 +51,15 @@ profile-startup:
 
 build-examples:
 	./build-examples.sh
+
+lint:
+	cargo fmt --all -- --check
+	cargo clippy
+
+timings:
+	cargo clean
+	cargo build --timings --example sprite
+	# RUSTFLAGS="-Z threads=8" cargo build --timings --example sprite
 
 serve:
 	simple-http-server target/generated -c wasm,html,js -i

@@ -14,13 +14,13 @@ mod events;
 mod fast_sprite;
 mod global_state;
 #[cfg(not(target_arch = "wasm32"))]
-mod hot_reload;
 mod input;
 mod lighting;
 mod math;
 mod perf_counters;
 mod quad;
 pub mod random;
+mod shaders;
 pub mod spatial_hash;
 mod task_timer;
 mod text;
@@ -39,14 +39,13 @@ pub use crate::errors::*;
 pub use crate::events::*;
 pub use crate::fast_sprite::*;
 pub use crate::global_state::*;
-#[cfg(not(target_arch = "wasm32"))]
-pub use crate::hot_reload::*;
 pub use crate::input::*;
 pub use crate::lighting::*;
 pub use crate::math::*;
 pub use crate::perf_counters::*;
 pub use crate::quad::*;
 pub use crate::random::*;
+pub use crate::shaders::*;
 pub use crate::task_timer::*;
 pub use crate::text::*;
 pub use crate::timer::*;
@@ -77,6 +76,9 @@ pub use rand::seq::SliceRandom;
 
 pub use smallvec::{self, SmallVec};
 
+pub use anyhow;
+pub use anyhow::{bail, Result};
+
 pub use bimap::BiHashMap;
 pub use fxhash;
 pub use num_traits;
@@ -106,6 +108,7 @@ pub use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 pub use bytemuck;
 pub use cfg_if::cfg_if;
 pub use egui;
+pub use egui_plot;
 pub use egui_winit;
 pub use env_logger;
 pub use epaint;
@@ -229,7 +232,7 @@ impl Name {
     }
 }
 
-pub fn default_hash<T: Hash>(value: &T) -> u64 {
+pub fn default_hash(value: &impl std::hash::Hash) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
@@ -529,16 +532,18 @@ pub enum BlendMode {
     Alpha,
 }
 
+// TODO: ... get rid of this
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextureParams {
     pub blend_mode: BlendMode,
-    pub shader: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct MeshDraw {
     pub mesh: Mesh,
     pub texture_params: TextureParams,
+    pub shader: Option<ShaderInstance>,
+    pub render_target: Option<RenderTargetId>,
 }
 
 pub struct DrawParams<'a> {
@@ -698,6 +703,10 @@ pub struct Color {
 impl Color {
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self { r, g, b, a }
+    }
+
+    pub const fn gray(value: f32) -> Self {
+        Self { r: value, g: value, b: value, a: 1.0 }
     }
 
     pub const fn rgb(r: f32, g: f32, b: f32) -> Self {
@@ -866,8 +875,7 @@ pub struct Sound {
 
 impl Sound {
     pub fn from_path(path: &str) -> Sound {
-        // TODO: use default hasher
-        Sound { id: egui::util::hash(path) }
+        Sound { id: simple_hash(path) }
     }
 }
 
@@ -875,18 +883,21 @@ impl Sound {
 pub enum TextureHandle {
     Path(u64),
     Raw(u64),
+    RenderTarget(RenderTargetId),
+}
+
+pub fn simple_hash(value: impl std::hash::Hash) -> u64 {
+    ahash::RandomState::with_seeds(1, 2, 3, 4).hash_one(value)
 }
 
 impl TextureHandle {
     // TODO: rename to something like "unchecked_id"
     pub fn from_path(path: &str) -> Self {
-        // TODO: hash with simple_hash
-        TextureHandle::Path(egui::util::hash(path))
+        TextureHandle::Path(simple_hash(path))
     }
 
     pub fn key_unchecked(key: &str) -> Self {
-        // TODO: hash with simple_hash
-        TextureHandle::Path(egui::util::hash(key))
+        TextureHandle::Path(simple_hash(key))
     }
 }
 

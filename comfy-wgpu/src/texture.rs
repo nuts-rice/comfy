@@ -5,6 +5,56 @@ use image::GenericImageView;
 use image::ImageResult;
 
 #[derive(Debug)]
+pub struct TextureCreationParams<'a> {
+    pub label: Option<&'a str>,
+    pub width: u32,
+    pub height: u32,
+    pub format: wgpu::TextureFormat,
+    pub mip_level_count: u32,
+    pub filter_mode: wgpu::FilterMode,
+    pub render_scale: f32,
+    pub view_formats: &'a [wgpu::TextureFormat],
+}
+
+impl Default for TextureCreationParams<'_> {
+    fn default() -> Self {
+        Self {
+            label: None,
+            width: 0,
+            height: 0,
+            format: wgpu::TextureFormat::Rgba16Float,
+            mip_level_count: 1,
+            filter_mode: wgpu::FilterMode::Linear,
+            render_scale: 1.0,
+            view_formats: &[],
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct BindableTexture {
+    pub texture: Texture,
+    pub bind_group: wgpu::BindGroup,
+}
+
+impl BindableTexture {
+    pub fn new(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        params: &TextureCreationParams,
+    ) -> Self {
+        let texture = Texture::create_with_params(device, params);
+
+        let label = params.label.map(|x| format!("{} Bind Group", x));
+
+        let bind_group =
+            device.simple_bind_group(label.as_deref(), &texture, layout);
+
+        Self { texture, bind_group }
+    }
+}
+
+#[derive(Debug)]
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -61,40 +111,63 @@ impl Texture {
         Self { texture, view, sampler }
     }
 
-    pub fn create_scaled_surface_texture(
+    pub fn create_with_params(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-        render_scale: f32,
-        label: &str,
+        params: &TextureCreationParams,
     ) -> Self {
-        Self::create_scaled_mip_surface_texture(
-            device,
-            config,
-            // config.format,
-            wgpu::TextureFormat::Rgba16Float,
-            render_scale,
-            1,
-            label,
-        )
-    }
+        let size = wgpu::Extent3d {
+            width: ((params.width as f32) * params.render_scale.sqrt()).round()
+                as u32,
+            height: ((params.height as f32) * params.render_scale.sqrt())
+                .round() as u32,
+            depth_or_array_layers: 1,
+        };
 
-    pub fn create_scaled_mip_surface_texture(
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-        format: wgpu::TextureFormat,
-        render_scale: f32,
-        mip_level_count: u32,
-        label: &str,
-    ) -> Self {
-        Self::create_scaled_mip_filter_surface_texture(
-            device,
-            config,
-            format,
-            render_scale,
-            mip_level_count,
-            wgpu::FilterMode::Linear,
-            label,
-        )
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: params.label,
+            size,
+            mip_level_count: params.mip_level_count,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: params.format,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING |
+                wgpu::TextureUsages::COPY_DST |
+                wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: params.view_formats,
+        });
+
+        let view_label = params.label.map(|x| format!("{} View", x));
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: view_label.as_deref(),
+            // TODO: fix this and move it to the pp layer instead
+            mip_level_count: if params.mip_level_count > 0 {
+                Some(1)
+            } else {
+                None
+            },
+            ..Default::default()
+        });
+
+        let sampler_label = params.label.map(|x| format!("{} Sampler", x));
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: sampler_label.as_deref(),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: params.filter_mode,
+            min_filter: params.filter_mode,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        Self {
+            texture,
+            view,
+            sampler,
+            // size,
+        }
     }
 
     pub fn create_scaled_mip_filter_surface_texture(
@@ -106,52 +179,16 @@ impl Texture {
         filter_mode: wgpu::FilterMode,
         label: &str,
     ) -> Self {
-        let size = wgpu::Extent3d {
-            width: ((config.width as f32) * render_scale.sqrt()).round() as u32,
-            height: ((config.height as f32) * render_scale.sqrt()).round()
-                as u32,
-            depth_or_array_layers: 1,
-        };
-
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
+        Self::create_with_params(device, &TextureCreationParams {
             label: Some(label),
-            size,
-            mip_level_count,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            // format: wgpu::TextureFormat::Rgba16Float,
-            // format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            width: config.width,
+            height: config.height,
             format,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING |
-                wgpu::TextureUsages::COPY_DST |
-                wgpu::TextureUsages::RENDER_ATTACHMENT,
+            mip_level_count,
+            filter_mode,
+            render_scale,
             view_formats: &[],
-        });
-
-        let view = texture.create_view(&wgpu::TextureViewDescriptor {
-            // TODO: fix this and move it to the pp layer instead
-            mip_level_count: if mip_level_count > 0 { Some(1) } else { None },
-            // base_mip_level: 0,
-            // mip_level_count: None,
-            ..Default::default()
-        });
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: filter_mode,
-            min_filter: filter_mode,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
-        Self {
-            texture,
-            view,
-            sampler,
-            // size,
-        }
+        })
     }
 
     pub fn from_bytes(

@@ -7,49 +7,13 @@ pub const BLOOM_MIP_LEVEL_COUNT: u32 = 10;
 const BLUR_DIR_ZERO: [u32; 4] = [0, 0, 0, 0];
 const BLUR_DIR_ONE: [u32; 4] = [1, 0, 0, 0];
 
-
-pub struct FrameBuffer {
-    pub texture: Texture,
-    pub bind_group: wgpu::BindGroup,
-}
-
-impl FrameBuffer {
-    pub fn new(
-        name: &str,
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-        format: wgpu::TextureFormat,
-        layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        let texture = Texture::create_scaled_mip_filter_surface_texture(
-            device,
-            config,
-            format,
-            1.0,
-            1,
-            wgpu::FilterMode::Linear,
-            &format!("{} Texture", name),
-        );
-
-        let bind_group = device.simple_bind_group(
-            &format!("{} Bind Group", name),
-            &texture,
-            layout,
-        );
-
-        Self { texture, bind_group }
-    }
-}
-
 pub struct Bloom {
     pub context: GraphicsContext,
 
     pub format: wgpu::TextureFormat,
     pub threshold: PostProcessingEffect,
     pub mipmap_generator: MipmapGenerator,
-    // pub blur_bind_group_layout: wgpu::BindGroupLayout,
-    pub blur_texture: Texture,
-    pub blur_bind_group: wgpu::BindGroup,
+    pub blur_texture: BindableTexture,
     pub mip_blur_pipeline: wgpu::RenderPipeline,
 
     pub merge_pipeline: wgpu::RenderPipeline,
@@ -62,7 +26,7 @@ pub struct Bloom {
     pub blur_direction_group_1: wgpu::BindGroup,
     pub blur_direction_layout: wgpu::BindGroupLayout,
 
-    pub pingpong: [FrameBuffer; 2],
+    pub pingpong: [BindableTexture; 2],
 
     pub lighting_params: Arc<wgpu::BindGroup>,
 }
@@ -70,112 +34,69 @@ pub struct Bloom {
 impl Bloom {
     pub fn new(
         context: &GraphicsContext,
-        config: &wgpu::SurfaceConfiguration,
+        shaders: &mut ShaderMap,
         format: wgpu::TextureFormat,
         lighting_params: Arc<wgpu::BindGroup>,
         lighting_params_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        // let threshold = PostProcessingEffect::new_with_mip(
-        //     "Bloom Threshold",
-        //     device,
-        //     &layout,
-        //     config,
-        //     format,
-        //     simple_fragment_shader(
-        //         "bloom-threshold",
-        //         include_str!("../../assets/shaders/bloom-threshold.wgsl"),
-        //     ),
-        //     BLOOM_MIP_LEVEL_COUNT,
-        //     wgpu::BlendState::REPLACE,
-        // );
+        let config = context.config.borrow();
 
         let device = &context.device;
         let texture_layout = &context.texture_layout;
 
         let threshold_render_texture =
-            Texture::create_scaled_mip_surface_texture(
+            Texture::create_scaled_mip_filter_surface_texture(
                 device,
-                config,
+                &config,
                 format,
                 1.0,
                 BLOOM_MIP_LEVEL_COUNT,
+                wgpu::FilterMode::Linear,
                 "Bloom Threshold Texture",
             );
 
-        let threshold = PostProcessingEffect {
-            name: "Bloom Threshold".into(),
-            enabled: true,
-            bind_group: device.simple_bind_group(
-                "Bloom Threshold Bind Group",
-                &threshold_render_texture,
-                texture_layout,
-            ),
-            render_texture: threshold_render_texture,
-            pipeline: create_post_processing_pipeline(
-                "Bloom Threshold",
-                device,
-                format,
-                &[texture_layout, lighting_params_layout],
-                reloadable_wgsl_fragment_shader!("bloom-threshold"),
-                wgpu::BlendState::REPLACE,
-            ),
+        let threshold = {
+            let shader = create_engine_post_processing_shader!(
+                shaders,
+                "bloom-threshold"
+            );
+
+            PostProcessingEffect {
+                id: shader.id,
+                name: "Bloom Threshold".into(),
+                enabled: true,
+                bind_group: device.simple_bind_group(
+                    Some("Bloom Threshold Bind Group"),
+                    &threshold_render_texture,
+                    texture_layout,
+                ),
+                render_texture: threshold_render_texture,
+                pipeline: create_post_processing_pipeline(
+                    "Bloom Threshold",
+                    device,
+                    format,
+                    &[texture_layout, lighting_params_layout],
+                    shader,
+                    wgpu::BlendState::REPLACE,
+                ),
+            }
         };
 
-        // simple_fragment_shader(
-        //     "bloom-threshold",
-        //     include_str!("../../assets/shaders/bloom-threshold.wgsl"),
-        // ),
+        let (width, height) = {
+            let config = context.config.borrow();
+            (config.width, config.height)
+        };
 
-        // let use_hdr = true;
-        // let hdr_format = wgpu::TextureFormat::Rgba16Float;
-
-
-        // let blur_bind_group_layout = device.simple_bind_group("Bloom Blur", texture, layout)
-        // let blur_bind_group_layout =
-        //     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        //         label: Some("Bloom Blur Bind Group Layout"),
-        //         entries: &[
-        //             wgpu::BindGroupLayoutEntry {
-        //                 binding: 0,
-        //                 visibility: wgpu::ShaderStages::FRAGMENT,
-        //                 ty: wgpu::BindingType::Texture {
-        //                     sample_type: wgpu::TextureSampleType::Float {
-        //                         filterable: true, // !use_hdr,
-        //                     },
-        //                     view_dimension: wgpu::TextureViewDimension::D2,
-        //                     multisampled: false,
-        //                 },
-        //                 count: None,
-        //             },
-        //             wgpu::BindGroupLayoutEntry {
-        //                 binding: 1,
-        //                 visibility: wgpu::ShaderStages::FRAGMENT,
-        //                 ty: wgpu::BindingType::Sampler(
-        //                     // if false && use_hdr {
-        //                     //     wgpu::SamplerBindingType::NonFiltering
-        //                     // } else {
-        //                     wgpu::SamplerBindingType::Filtering, // },
-        //                 ),
-        //                 count: None,
-        //             },
-        //         ],
-        //     });
-
-
-        let blur_texture = Texture::create_scaled_mip_filter_surface_texture(
+        let blur_texture = BindableTexture::new(
             device,
-            config,
-            format,
-            1.0,
-            1,
-            wgpu::FilterMode::Linear,
-            "Bloom Blur Texture",
-        );
-
-        let blur_bind_group = device.simple_bind_group(
-            "Bloom Blur Bind Group",
-            &blur_texture,
             texture_layout,
+            &TextureCreationParams {
+                label: Some("Bloom Blue Texture"),
+                width,
+                height,
+                format,
+                ..Default::default()
+            },
         );
 
         let mip_blur_pipeline = create_post_processing_pipeline(
@@ -183,13 +104,7 @@ impl Bloom {
             device,
             format,
             &[texture_layout],
-            simple_fragment_shader(
-                "bloom-mip-blur",
-                include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/shaders/bloom-mip-blur.wgsl"
-                )),
-            ),
+            create_engine_post_processing_shader!(shaders, "bloom-mip-blur"),
             wgpu::BlendState {
                 color: wgpu::BlendComponent {
                     src_factor: wgpu::BlendFactor::Constant,
@@ -205,13 +120,7 @@ impl Bloom {
             device,
             format,
             &[texture_layout],
-            simple_fragment_shader(
-                "bloom-mip-blur",
-                include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/shaders/bloom-merge.wgsl"
-                )),
-            ),
+            create_engine_post_processing_shader!(shaders, "bloom-merge"),
             wgpu::BlendState {
                 color: wgpu::BlendComponent {
                     src_factor: wgpu::BlendFactor::Constant,
@@ -224,20 +133,30 @@ impl Bloom {
 
         let mipmap_generator = MipmapGenerator::new(device, format);
 
+        let params = TextureCreationParams {
+            label: Some("Bloom Ping Pong 0"),
+            width,
+            height,
+            format,
+            ..Default::default()
+        };
+
         let pingpong = [
-            FrameBuffer::new(
-                "Bloom Ping Pong 0",
+            BindableTexture::new(
                 device,
-                config,
-                format,
                 texture_layout,
+                &TextureCreationParams {
+                    label: Some("Bloom Ping Pong 0"),
+                    ..params
+                },
             ),
-            FrameBuffer::new(
-                "Bloom Ping Pong 1",
+            BindableTexture::new(
                 device,
-                config,
-                format,
                 texture_layout,
+                &TextureCreationParams {
+                    label: Some("Bloom Ping Pong 1"),
+                    ..params
+                },
             ),
         ];
 
@@ -293,19 +212,12 @@ impl Bloom {
                 }],
             });
 
-
         let gaussian_pipeline = create_post_processing_pipeline(
             "Bloom Gaussian",
             device,
             format,
             &[texture_layout, lighting_params_layout, &blur_direction_layout],
-            simple_fragment_shader(
-                "bloom-gauss",
-                include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/shaders/bloom-gauss.wgsl"
-                )),
-            ),
+            create_engine_post_processing_shader!(shaders, "bloom-gauss"),
             wgpu::BlendState::REPLACE,
         );
 
@@ -317,10 +229,7 @@ impl Bloom {
             threshold,
             mipmap_generator,
             // mipmaps, mipmaps_bind_group,
-
-            // blur_bind_group_layout,
             blur_texture,
-            blur_bind_group,
             mip_blur_pipeline,
 
             blur_direction_buffer_0,
@@ -509,7 +418,7 @@ impl Bloom {
                     &self.mip_blur_pipeline,
                     &mip_bind_group,
                     &self.lighting_params,
-                    &self.blur_texture.view,
+                    &self.blur_texture.texture.view,
                     i == 0,
                     Some(blend),
                 );
@@ -528,7 +437,7 @@ impl Bloom {
             encoder,
             &self.merge_pipeline,
             if GlobalParams::get_int("bloom_alg") == 0 {
-                &self.blur_bind_group
+                &self.blur_texture.bind_group
             } else {
                 &self.pingpong[0].bind_group
             },

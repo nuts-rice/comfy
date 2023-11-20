@@ -60,8 +60,7 @@ pub struct WgpuTextureCreator {
     pub device: Arc<wgpu::Device>,
     pub queue: Arc<wgpu::Queue>,
     pub layout: Arc<wgpu::BindGroupLayout>,
-    pub textures:
-        Arc<Mutex<HashMap<TextureHandle, (wgpu::BindGroup, Texture)>>>,
+    pub textures: Arc<Mutex<TextureMap>>,
 }
 
 impl TextureCreator for WgpuTextureCreator {
@@ -75,10 +74,12 @@ impl TextureCreator for WgpuTextureCreator {
                 .unwrap();
 
         let bind_group =
-            self.device.simple_bind_group(name, &texture, &self.layout);
+            self.device.simple_bind_group(Some(name), &texture, &self.layout);
 
         let handle = texture_path(name);
-        self.textures.lock().insert(handle, (bind_group, texture));
+        self.textures
+            .lock()
+            .insert(handle, BindableTexture { bind_group, texture });
 
         handle
     }
@@ -92,7 +93,7 @@ impl TextureCreator for WgpuTextureCreator {
         };
 
         let textures = self.textures.lock();
-        let texture = &textures.get(&handle).unwrap().1;
+        let texture = &textures.get(&handle).unwrap().texture;
 
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
