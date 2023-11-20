@@ -81,6 +81,8 @@ pub struct Heightmap {
     exponent: i32,
     spread_rate: f32,
     colormap_name: String,
+    rooms: Vec<Room>,
+    rects: Vec<Rect>,
 }
 impl Heightmap {
     pub fn new(exp: i32, spread: f32, color_name: &str) -> Heightmap {
@@ -101,6 +103,8 @@ impl Heightmap {
             spread_rate: spread,
             exponent: exp,
             colormap_name: color_name.to_string(),
+            rooms: Vec::new(),
+            rects: Vec::new(),                    
         }
     }
     //Midpoint displacemnt used here
@@ -141,6 +145,7 @@ impl Heightmap {
                     );
                     let displace = rng_val * self.spread_rate;
                     let t = square_avg + displace;
+                    // let canidate_room
                     let color: Color =
                         Self::terrain_lerp(t, &self.colormap_name);
                     self.positions.borrow_mut()[x as usize][y as usize] =
@@ -252,38 +257,38 @@ fn setup(_c: &mut EngineContext) {
 fn update(_c: &mut EngineContext) {
     use GenerativeMethod::*;
     use MapSize::*;
+    use Tileset::*;
     clear_background(GRAY.alpha(0.1));
     let _viewport = main_camera().world_viewport() / 2.0;
     egui::Window::new("Map size")
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(10.0, 10.0))
         .show(egui(), |ui| {
             let mut map_size = MAP_SIZE.borrow_mut();
-            ui.radio_value(&mut *map_size, Big, "Big");
-            ui.radio_value(&mut *map_size, Small, "Small");
+            if ui.radio_value(&mut *map_size, Big, "Big").clicked() {
+                let mut big_map = Heightmap::new(7, 0.44, "comfy");
+                big_map.displace();
+                big_map.draw_heightmap();
+            }
+            if ui.radio_value(&mut *map_size, Small, "Small").clicked(){
+                let mut small_map = Heightmap::new(3, 0.44, "comfy");
+                small_map.displace();
+                small_map.draw_heightmap();
+            };
         });
-    let size = match *MAP_SIZE.borrow() {
-        Small => 3,
-        Big => 7,
-    };
-    let mut map = Heightmap::new(size, 0.44, "comfy");
-    if is_key_pressed(KeyCode::Space) {
-        map.displace();
-        map.draw_heightmap();            
-    }
-    egui::Window::new("Generative method")
-        .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(10.0, 10.0))
-        .show(egui(), |ui| {
-            let mut gen_method = GEN_METHOD.borrow_mut();
-            ui.radio_value(&mut *gen_method, Midpoint, "Midpoint displacement");
-            ui.radio_value(&mut *gen_method, WFC, "Wave Function Collapse");
-        });
+    // egui::Window::new("Generative method")
+    //     .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(10.0, 10.0))
+    //     .show(egui(), |ui| {
+    //         let mut gen_method = GEN_METHOD.borrow_mut();
+    //         ui.radio_value(&mut *gen_method, Midpoint, "Midpoint displacement");
+    //         ui.radio_value(&mut *gen_method, WFC, "Wave Function Collapse");
+    //     });
 
-    egui::Window::new("Generative method")
+    egui::Window::new("Tileset")
         .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(10.0, 10.0))
         .show(egui(), |ui| {
-            let mut gen_method = GEN_METHOD.borrow_mut();
-            ui.radio_value(&mut *gen_method, Midpoint, "Midpoint displacement");
-            ui.radio_value(&mut *gen_method, WFC, "Wave Function Collapse");
+            let mut  tileset = TILESET.borrow_mut();
+            ui.radio_value(&mut *tileset, Colors, "Colors");
+            ui.radio_value(&mut *tileset, Dungeon, "Dungeon");
         });
 
     // MapSize::Small => {
