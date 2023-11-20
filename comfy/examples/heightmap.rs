@@ -1,6 +1,5 @@
 use comfy::*;
 //Color map
-
 simple_game!("Proc gen demo", setup, update);
 
 
@@ -36,7 +35,7 @@ pub struct Position {
     pub color: Color,
     pub tiletype: TileType,
 }
-
+#[derive(Copy, Clone,Debug)]
 pub struct Rect {
     top_left: Position,
     bottom_right: Position,
@@ -48,9 +47,6 @@ pub struct Room {
 impl Rect {
     pub fn new(top_left: Position, bottom_right: Position) -> Rect {
         Rect { top_left, bottom_right }
-    }
-    pub fn xy_idx(&self, x: i32, y: i32) -> usize {
-        (y * (self.bottom_right.x - self.top_left.x) + x) as usize
     }
     pub fn intersects(&self, other: &Rect) -> bool {
         self.top_left.x <= other.bottom_right.x &&
@@ -67,9 +63,10 @@ impl Rect {
         }
     }
 }
-pub fn apply_room_to_map(room: &Room, map: &mut Heightmap) {
-    for x in room.top_left.x..room.bottom_right.x {
-        for y in room.top_left.y..room.bottom_right.y {
+pub fn apply_room_to_map(room: &Rect, map: &mut Heightmap) {
+    for x in room.top_left.x + 1..=room.bottom_right.x {
+        for y in room.top_left.y + 1..=room.bottom_right.y {
+            let idx =
             map.positions.borrow_mut()[x as usize][y as usize].tiletype =
                 TileType::Floor;
         }
@@ -77,16 +74,20 @@ pub fn apply_room_to_map(room: &Room, map: &mut Heightmap) {
 }
 pub struct Heightmap {
     size: usize,
+    width: i32,
+    height: i32,
     positions: AtomicRefCell<Vec<Vec<Position>>>,
     exponent: i32,
     spread_rate: f32,
     colormap_name: String,
-    rooms: Vec<Room>,
+    rooms: Vec<Rect>,
     rects: Vec<Rect>,
 }
 impl Heightmap {
     pub fn new(exp: i32, spread: f32, color_name: &str) -> Heightmap {
         let _size = 2_i32.pow(exp.try_into().unwrap()) as usize;
+        let width = _size as i32 / 2;
+        let height = _size as i32 / 2;
         let default_color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
         let default_position = Position {
             x: 0,
@@ -100,6 +101,8 @@ impl Heightmap {
         Heightmap {
             positions,
             size: _size,
+            width,
+            height,
             spread_rate: spread,
             exponent: exp,
             colormap_name: color_name.to_string(),
@@ -145,7 +148,36 @@ impl Heightmap {
                     );
                     let displace = rng_val * self.spread_rate;
                     let t = square_avg + displace;
-                    // let canidate_room
+                    let canidate_room: Rect = Rect::new(
+                        Position {
+                            x: x - t as i32,
+                            y: y - t as i32,
+                            color: Self::terrain_lerp(t, &self.colormap_name),
+                            tiletype: TileType::Floor,
+                        },
+                        Position {
+                            x: x + t as i32,
+                            y: y + t as i32,
+                            color: Self::terrain_lerp(t, &self.colormap_name),
+                            tiletype: TileType::Floor,
+                        },
+                    );
+                    let mut ok = true;
+                    for other_rooms in self.rooms.iter() {
+                        if canidate_room.intersects(other_rooms) {
+                            ok = false;
+                        }
+                    }
+                    if ok {
+                        apply_room_to_map(&canidate_room, self);
+                        if !self.rooms.is_empty() {
+                            let new_position = canidate_room.center();
+                            let prev_position =
+                                self.rooms[self.rooms.len() - 1].center();
+                        }
+                    }
+                    println!("canidate room: {:?}", canidate_room);
+                    self.rooms.push(canidate_room);
                     let color: Color =
                         Self::terrain_lerp(t, &self.colormap_name);
                     self.positions.borrow_mut()[x as usize][y as usize] =
@@ -202,7 +234,7 @@ impl Heightmap {
     pub fn draw_heights(&self) {
         unimplemented!()
     }
-
+    
 
     pub fn draw_heightmap(&self) {
         for row in self.positions.borrow().iter() {
@@ -215,6 +247,10 @@ impl Heightmap {
                 );
             }
         }
+    }
+
+    pub fn xy_idx(&self, x: i32, y: i32) -> usize {
+        (y as usize * self.width as usize ) + x as usize
     }
 }
 
@@ -291,25 +327,5 @@ fn update(_c: &mut EngineContext) {
             ui.radio_value(&mut *tileset, Dungeon, "Dungeon");
         });
 
-    // MapSize::Small => {
-    //     let mut small_map = Heightmap::new(3, 0.44);
-    //     small_map.displace();
-    //     small_map.draw_heightmap();
-    // }
-
-    // MapSize::Big => {
-    //             let mut big_map = Heightmap::new(7, 0.44);
-    //     big_map.displace();
-    //     big_map.draw_heightmap();
-
-    // }
 }
 
-
-// map.displace();
-// map.draw_heightmap();
-
-
-// let size = match *MAP_SIZE.borrow() {
-//     MapSize =>
-// }
