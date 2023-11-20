@@ -35,10 +35,10 @@ pub use crate::egui_utils::*;
 pub use crate::engine::*;
 pub use crate::game::*;
 pub use crate::game_loop::*;
-pub use crate::macros::*;
+// pub use crate::macros::*;
 pub use crate::particles::*;
 pub use crate::render::*;
-pub use crate::shaders::*;
+// pub use crate::shaders::*;
 pub use crate::timer::*;
 pub use crate::trail::*;
 pub use crate::update_stages::*;
@@ -55,9 +55,7 @@ pub use std::{
     },
 };
 
-pub use comfy_core;
-pub use comfy_core::*;
-pub use comfy_core::{Assets, *};
+pub use comfy_core::{self, Assets, *};
 
 pub use std::path::Path;
 
@@ -222,8 +220,6 @@ fn maybe_setup_tracy() -> i32 {
 fn maybe_setup_tracy() -> tracy_client::Client {
     info!("CONNECTING TO TRACY");
 
-    let client = tracy_client::Client::start();
-
     // let file_appender = tracing_appender::rolling::daily("logs", "log"); //
     // This should be user configurable let (non_blocking, _worker_guard) =
     //     tracing_appender::non_blocking(file_appender);
@@ -253,5 +249,5 @@ fn maybe_setup_tracy() -> tracy_client::Client {
     // let target_framerate = if cfg!(feature = "dev") { 10000 } else { 60 };
     // let target_framerate = if cfg!(feature = "dev") { 60 } else { 60 };
 
-    client
+    tracy_client::Client::start()
 }

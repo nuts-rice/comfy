@@ -62,8 +62,6 @@ pub fn run_late_update_stages(c: &mut EngineContext, delta: f32) {
     process_temp_draws(c);
     combat_text_system();
     process_notifications(c);
-    show_errors(c);
-    update_perf_counters(c);
     show_lighting_ui(c);
 
     c.draw.borrow_mut().marks.retain_mut(|mark| {
@@ -77,10 +75,7 @@ pub fn run_late_update_stages(c: &mut EngineContext, delta: f32) {
             0.1,
             mark.color,
             90,
-            TextureParams {
-                blend_mode: BlendMode::Alpha,
-                ..Default::default()
-            },
+            TextureParams { blend_mode: BlendMode::Alpha },
         );
     }
 
@@ -102,6 +97,7 @@ pub fn run_late_update_stages(c: &mut EngineContext, delta: f32) {
     }
 
     main_camera_mut().update(delta);
+    show_errors(c);
     commands().run_on(&mut world_mut());
     world_mut().flush();
 }
@@ -489,6 +485,7 @@ fn process_notifications(_c: &mut EngineContext) {
                 });
                 ui.add_space(28.0);
 
+                // TODO: lol, this really shouldn't be here anymore
                 // let bg = nine_patch_rect_ex(
                 //     egui::Rect::from_min_size(
                 //         ui.clip_rect().left_top(),
@@ -505,9 +502,7 @@ fn process_notifications(_c: &mut EngineContext) {
 }
 
 fn show_errors(_c: &mut EngineContext) {
-    if cfg!(feature = "dev") &&
-        game_config().dev.recording_mode == RecordingMode::None
-    {
+    if cfg!(feature = "dev") {
         let errors = ERRORS.borrow();
 
         if !errors.data.is_empty() {
@@ -524,7 +519,8 @@ fn show_errors(_c: &mut EngineContext) {
     }
 }
 
-fn update_perf_counters(c: &mut EngineContext) {
+#[doc(hidden)]
+pub fn update_perf_counters(c: &mut EngineContext, game_loop: &impl GameLoop) {
     if cfg!(not(feature = "ci-release")) && game_config().dev.show_fps {
         let _span = span!("perf counters");
 
@@ -564,9 +560,8 @@ fn update_perf_counters(c: &mut EngineContext) {
                 ui.label(format!("   99th: {:.0}", fps.percentile_99));
 
                 ui.separator();
-                if let Some(game_loop) = c.game_loop {
-                    game_loop.lock().performance_metrics(&mut world_mut(), ui);
-                }
+
+                game_loop.performance_metrics(&mut world_mut(), ui);
 
                 ui.separator();
 
