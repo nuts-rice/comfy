@@ -1,7 +1,7 @@
 use comfy::*;
 //Color map
 simple_game!("Proc gen demo", setup, update);
-
+use std::cmp::{max, min};
 
 pub fn color_data(colormap_name: &str) -> [Color; 7] {
     
@@ -21,7 +21,7 @@ pub fn color_data(colormap_name: &str) -> [Color; 7] {
         _ => [DARKRED, ORANGE_RED, ORANGE, YELLOW, DARKBROWN, LIME_GREEN, BLUE],
     }
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum TileType {
     Floor,
     Wall,
@@ -66,9 +66,8 @@ impl Rect {
 pub fn apply_room_to_map(room: &Rect, map: &mut Heightmap) {
     for x in room.top_left.x + 1..=room.bottom_right.x {
         for y in room.top_left.y + 1..=room.bottom_right.y {
-            let idx =
-            map.positions.borrow_mut()[x as usize][y as usize].tiletype =
-                TileType::Floor;
+            let idx = map.xy_idx(x, y);
+            map.tiles[idx] = TileType::Floor;
         }
     }
 }
@@ -82,6 +81,7 @@ pub struct Heightmap {
     colormap_name: String,
     rooms: Vec<Rect>,
     rects: Vec<Rect>,
+    tiles: Vec<TileType>,
 }
 impl Heightmap {
     pub fn new(exp: i32, spread: f32, color_name: &str) -> Heightmap {
@@ -108,10 +108,14 @@ impl Heightmap {
             colormap_name: color_name.to_string(),
             rooms: Vec::new(),
             rects: Vec::new(),                    
+            tiles: vec![TileType::Wall; _size * _size]
+                    
         }
     }
     //Midpoint displacemnt used here
     pub fn displace(&mut self) {
+        const MIN_SIZE: i32 = 3;
+        const MAX_SIZE: i32 = 9;
         let mut resolution = (2_f32.powf(self.size as f32) - 1.) as i32;
         while resolution >= 1 {
             let half_res = resolution / 2;
@@ -147,18 +151,21 @@ impl Heightmap {
                         bottom_right,
                     );
                     let displace = rng_val * self.spread_rate;
-                    let t = square_avg + displace;
-                    let canidate_room: Rect = Rect::new(
+                    let t = (square_avg  + displace)  ;
+                    println!("t: {}", t as f32);
+                    // let w = gen_range(t, MAX_SIZE as f32);
+                    // let h = gen_range(t, MAX_SIZE as f32);
+                        let canidate_room: Rect = Rect::new(
                         Position {
                             x: x - t as i32,
                             y: y - t as i32,
-                            color: Self::terrain_lerp(t, &self.colormap_name),
+                            color: Self::terrain_lerp(t , &self.colormap_name),
                             tiletype: TileType::Floor,
                         },
                         Position {
-                            x: x + t as i32,
-                            y: y + t as i32,
-                            color: Self::terrain_lerp(t, &self.colormap_name),
+                            x: x + (t )  as i32,
+                            y: y + (t ) as i32,
+                            color: Self::terrain_lerp(t , &self.colormap_name),
                             tiletype: TileType::Floor,
                         },
                     );
@@ -168,18 +175,43 @@ impl Heightmap {
                             ok = false;
                         }
                     }
-                    if ok {
+                    if ok  {
+                    // if self.is_possible(canidate_room, t) {
                         apply_room_to_map(&canidate_room, self);
                         if !self.rooms.is_empty() {
                             let new_position = canidate_room.center();
                             let prev_position =
                                 self.rooms[self.rooms.len() - 1].center();
+                            if random_range(0.0, 1.0) > 0.5 {
+                                self.apply_horizontal_tunnel(
+                                    prev_position.x,
+                                    new_position.x,
+                                    prev_position.y,
+                                );
+                                self.apply_vertical_tunnel(
+                                    prev_position.y,
+                                    new_position.y,
+                                    new_position.x,
+                                );
+                            } else {
+                                self.apply_vertical_tunnel(
+                                    prev_position.y,
+                                    new_position.y,
+                                    prev_position.x,
+                                );
+                                self.apply_horizontal_tunnel(
+                                    prev_position.x,
+                                    new_position.x,
+                                    new_position.y,
+                                );
+                            }
+                                                    
                         }
                     }
                     println!("canidate room: {:?}", canidate_room);
                     self.rooms.push(canidate_room);
                     let color: Color =
-                        Self::terrain_lerp(t, &self.colormap_name);
+                        Self::terrain_lerp(t , &self.colormap_name);
                     self.positions.borrow_mut()[x as usize][y as usize] =
                         Position { x, y, color, tiletype: TileType::Floor };
                 }
@@ -187,10 +219,51 @@ impl Heightmap {
             resolution /= 2;
         }
     }
+    pub fn is_possible(&self ,canidate: Rect, t: f32 )   -> bool {
+        let mut expanded = canidate;
+        expanded.top_left.x -= (t ) as i32;
+        expanded.bottom_right.x += (t ) as i32;
+        expanded.top_left.y -= (t ) as i32;
+        expanded.bottom_right.y += (t ) as i32;
+        let mut can_build = true;
+        for y in expanded.top_left.y..=expanded.bottom_right.y {
+            for x in expanded.top_left.x..=expanded.bottom_right.x {
+                if x > self.width - 2 {can_build = false; }
+                if y > self.height - 2 {can_build = false; }
+                if x < 1 {can_build = false; }
+                if y < 1 {can_build = false; }
+                if can_build {
+                    let idx = self.xy_idx(x, y) ;
+                    if self.tiles[idx] != TileType::Wall {
+                        can_build = false;
+                    }
+                }
+
+            }
+        }
+        can_build
+
+    } 
     //Wave function collapse:
     //see https://github.com/mxgmn/WaveFunctionCollapse
     pub fn wfc(&mut self) {
         unimplemented!()
+    }
+    pub fn apply_horizontal_tunnel(&mut self, x1: i32, x2: i32, y: i32) {
+        for x in min(x1, x2)..=max(x1, x2) {
+            let idx = self.xy_idx(x, y);
+            if idx > 0 && idx < self.tiles.len() {
+                self.tiles[idx] = TileType::Floor;
+            }
+        }
+    }
+    pub fn apply_vertical_tunnel(&mut self, y1: i32, y2: i32, x: i32) {
+        for y in min(y1, y2)..=max(y1, y2) {
+            let idx = self.xy_idx(x, y);
+            if idx > 0 && idx < self.tiles.len() {
+                self.tiles[idx] = TileType::Floor;
+            }
+        }
     }
     fn get_tiletype(&self, x: i32, y: i32) -> Option<TileType> {
         if x >= 0 && x < self.size as i32 && y >= 0 && y < self.size as i32 {
@@ -234,7 +307,32 @@ impl Heightmap {
     pub fn draw_heights(&self) {
         unimplemented!()
     }
-    
+    pub fn draw_rooms(&self, c: &mut EngineContext) {
+            c.load_texture_from_bytes(
+        "floor",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/assets/floor.png"
+        )),
+    );
+    c.load_texture_from_bytes(
+        "wall",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/assets/wall.png"
+        )),
+    );
+
+        for room in self.rooms.iter() {
+            for x in room.top_left.x..=room.bottom_right.x {
+                for y in room.top_left.y..=room.bottom_right.y {
+                    commands().spawn((Sprite::new("floor".to_string(), vec2(1.0, 1.0), 0, WHITE).with_rect(x, y, 12, 12), 
+                                      Transform::position(vec2(x as f32, y as f32,)), ));
+                }
+            }
+                    
+        }
+    }
 
     pub fn draw_heightmap(&self) {
         for row in self.positions.borrow().iter() {
@@ -260,6 +358,13 @@ pub fn load_assets(c: &mut EngineContext) {
         include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/assets/floor.png"
+        )),
+    );
+    c.load_texture_from_bytes(
+        "wall",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/assets/wall.png"
         )),
     );
 }
@@ -295,22 +400,23 @@ fn update(_c: &mut EngineContext) {
     use MapSize::*;
     use Tileset::*;
     clear_background(GRAY.alpha(0.1));
-    let _viewport = main_camera().world_viewport() / 2.0;
+    let _viewport = main_camera().world_viewport() ;
     egui::Window::new("Map size")
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(10.0, 10.0))
         .show(egui(), |ui| {
             let mut map_size = MAP_SIZE.borrow_mut();
-            if ui.radio_value(&mut *map_size, Big, "Big").clicked() {
-                let mut big_map = Heightmap::new(7, 0.44, "comfy");
-                big_map.displace();
-                big_map.draw_heightmap();
-            }
-            if ui.radio_value(&mut *map_size, Small, "Small").clicked(){
-                let mut small_map = Heightmap::new(3, 0.44, "comfy");
-                small_map.displace();
-                small_map.draw_heightmap();
-            };
+            ui.radio_value(&mut *map_size, Big, "Big");
+            ui.radio_value(&mut *map_size, Small, "Small");
         });
+    let map_size = match *MAP_SIZE.borrow(){
+        Small => 3,
+        Big => 7,            
+    };
+    let mut map = Heightmap::new(map_size, 0.44, "comfy");
+    
+    map.displace();
+    map.draw_heightmap();
+    
     // egui::Window::new("Generative method")
     //     .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(10.0, 10.0))
     //     .show(egui(), |ui| {
@@ -324,7 +430,11 @@ fn update(_c: &mut EngineContext) {
         .show(egui(), |ui| {
             let mut  tileset = TILESET.borrow_mut();
             ui.radio_value(&mut *tileset, Colors, "Colors");
-            ui.radio_value(&mut *tileset, Dungeon, "Dungeon");
+            if ui.radio_value(&mut *tileset, Dungeon, "Dungeon").clicked() {
+                let mut dungeon_map = Heightmap::new(3, 0.44, "dungeon");
+                dungeon_map.displace();
+                dungeon_map.draw_rooms(_c);
+            };
         });
 
 }
