@@ -127,15 +127,15 @@ impl Heightmap {
                 {
                     //TODO: set tiletype
                     let top_left = self
-                        .get_color(x - half_res, y - half_res)
+                        .get_color(x - half_res, y + half_res)
                         .unwrap_or(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 })
                         .r;
                     let top_right = self
-                        .get_color(x + half_res, y - half_res)
+                        .get_color(x + half_res, y + half_res)
                         .unwrap_or(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 })
                         .r;
                     let bottom_left = self
-                        .get_color(x - half_res, y + half_res)
+                        .get_color(x - half_res, y - half_res)
                         .unwrap_or(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 })
                         .r;
                     let bottom_right = self
@@ -143,7 +143,7 @@ impl Heightmap {
                         .unwrap_or(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 })
                         .r;
 
-                    let rng_val = random_range(0., 1.0);
+                    let rng_val = random_range(0., 3.0);
                     let square_avg = Self::calculate_square_average(
                         top_left,
                         top_right,
@@ -151,7 +151,7 @@ impl Heightmap {
                         bottom_right,
                     );
                     let displace = rng_val * self.spread_rate;
-                    let t = (square_avg  + displace)  ;
+                    let t = (square_avg  + displace)   ;
                     println!("t: {}", t as f32);
                     // let w = gen_range(t, MAX_SIZE as f32);
                     // let h = gen_range(t, MAX_SIZE as f32);
@@ -401,21 +401,30 @@ fn update(_c: &mut EngineContext) {
     use Tileset::*;
     clear_background(GRAY.alpha(0.1));
     let _viewport = main_camera().world_viewport() ;
+
     egui::Window::new("Map size")
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(10.0, 10.0))
         .show(egui(), |ui| {
             let mut map_size = MAP_SIZE.borrow_mut();
-            ui.radio_value(&mut *map_size, Big, "Big");
-            ui.radio_value(&mut *map_size, Small, "Small");
+            if ui.radio_value(&mut *map_size, Big, "Big").clicked(){
+                 let mut map = Heightmap::new(7, 0.44, "comfy");
+    map.displace();
+    map.draw_heightmap();
+                
+            }
+            if ui.radio_value(&mut *map_size, Small, "Small").clicked() {
+                 let mut map = Heightmap::new(3, 0.44, "comfy");
+                
+    map.displace();
+    map.draw_heightmap();
+
+            };
         });
     let map_size = match *MAP_SIZE.borrow(){
         Small => 3,
         Big => 7,            
     };
-    let mut map = Heightmap::new(map_size, 0.44, "comfy");
     
-    map.displace();
-    map.draw_heightmap();
     
     // egui::Window::new("Generative method")
     //     .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(10.0, 10.0))
