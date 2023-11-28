@@ -16,7 +16,7 @@ struct Args {
 }
 
 pub fn gen_seed() -> [u32; 2] {
-    let mut rand_val : [u32; 2] = [rand(), rand()];
+    let rand_val : [u32; 2] = [rand(), rand()];
     rand_val
 }
 
@@ -72,7 +72,9 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
                     "time".to_string() => UniformDef::F32(None),
                     "intensity".to_string() => UniformDef::F32(Some(1.0)),
                     // "pattern intensity".to_string() => UniformDef::F32(Some(1.0)),
-                    // "seed".to_string() => UniformDef::Custom(Some(1)),
+                    "seed1".to_string() => UniformDef::F32(Some(1.0)),
+                    "seed2".to_string() => UniformDef::F32(Some(1.0)),
+
                                     
                 },
             )
@@ -116,10 +118,29 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     // and instead be done in two separate render passes. This is unavoidable and should be
     // expected, but we're mentioning it here just for extra clarity.
     set_uniform_f32("intensity", state.intensity);
+
     // set_uniform_f32("pattern intensity", state.pattern_intensity);
     draw_comfy(vec2(2.0, 0.0), WHITE, 0, splat(1.0));
 
     // We can also easily switch back to the default sprite shader.
     use_default_shader();
     draw_comfy(vec2(4.0, 0.0), WHITE, 0, splat(1.0));
+    use_shader(shader_id);
+    let time = get_time() as f32;
+    set_uniform_f32("time", time);
+    set_uniform_f32("intensity", state.intensity);
+    set_uniform_f32("seed1", state.seed.get(0).unwrap().clone() as f32);
+    set_uniform_f32("seed2", state.seed.get(1).unwrap().clone() as f32);
+    draw_comfy(vec2(6.0, 0.0), WHITE, 0, splat(1.0));
+
 }
+
+//experment with 2.5d
+// fn draw_room(pos: Vec2) {
+//     let pos = pos.extend(0.0);
+// draw_mesh_ex(Mesh {
+//     vertices: vec![
+//         SpriteVertex::new()
+//     ]
+// })
+// }
