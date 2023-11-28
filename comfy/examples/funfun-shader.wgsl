@@ -1,10 +1,16 @@
-float hash(int n) {
-n = (n << 13) ^ n;
-n = n * (n * n * 15731 + 789221) + 1376312589;
-return -1.0 + 2.0 * float(n & ivec3(0xffffffff) / float(0xffffffff);
+fn hash(n: vec2<u32>)  -> u32 {
+let p1 = 1103515245u;
+var p = p1 * ((n >> 1u) ^ (n.yx));
+var h32 = p1 * ((p.x) ^ (p.y >> 3u)); 
+return h32^(h32 >> 16u);
 }
 
-float fbm()
+fn fbm(p: vec2<f32>) -> f32 {
+var v = 0.0;
+
+return v;
+
+}
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -19,4 +25,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     final_color.r = final_color.r * abs(cos(time * 3.0));
     final_color.g = final_color.g * abs(sin(time * 2.0));
     final_color.b = final_color.b * abs(cos(time * 5.0));
+    final_color = final_color * intensity;
+
+    return final_color;
+}
 

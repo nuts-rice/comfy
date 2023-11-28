@@ -36,6 +36,10 @@ use-wgpu = ["comfy-wgpu"]
 [dependencies]
 comfy-wgpu = { path = "../comfy-wgpu", version = "0.2.0", optional = true }
 comfy-core = { path = "../comfy-core", version = "0.2.0" }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing = "0.1.40"
+tracing-tracy = { version = "0.10.4", features = ["enable"] }
+clap = { version = "4.4.10", features = ["derive"] }
 
 [[example]]
 name = "physics"
