@@ -2,16 +2,134 @@ use comfy::*;
 
 simple_game!("ECS Topdown Game", setup, update);
 
+static WORLD_WIDTH: i32 = 50;
+static WORLD_HEIGHT: i32 = 50;
+
+#[derive(Clone, Eq, Debug, PartialEq, Hash)]
+pub enum Movement {
+    Static,
+    Random,
+    RandomWaypoint { path: Option<Vec<usize>> },
+}
+
+#[derive(Clone, Debug)]
+pub struct MoveMode {
+    pub mode: Movement,
+}
+
 struct Player;
 struct Grass;
+struct Mob {
+    pub position: Vec2,
+    pub velocity: Vec2,
+    pub move_mode: Movement,
+    pub move_target: Vec2,
+    pub move_timer: f32,
+}
+
+pub struct GameState {
+    pub player: Player,
+    pub mobs: Vec<Mob>,
+    pub rooms: Vec<Rect>,
+    pub rects: Vec<Rect>,
+}
+
+
+fn piss_off_mob(_state: &mut GameState, _new_target: &mut Vec2) {
+    unimplemented!()
+}
+
+fn random_move_mob(_state: &mut GameState, _new_target: &mut Vec2) {
+    unimplemented!()
+}
+
+fn move_mobs(state: &mut GameState, time_delta: f32) {
+    for mob in state.mobs.iter_mut() {
+        let _new_pos = mob.position + mob.velocity * time_delta;
+        // piss_off_mob(state, &mut new_pos);
+    }
+}
+fn gen_rooms(state: &mut GameState, _c: &mut EngineContext) {
+    state.rects.clear();
+    state.rects.push(Rect::new(
+        2.,
+        2.,
+        WORLD_WIDTH as f32 - 5.,
+        WORLD_HEIGHT as f32 - 5.,
+    ));
+    let first_room = state.rects[0];
+    add_subrects(state, first_room);
+    let n_rooms = 0;
+    while n_rooms < 15 {
+        let _rect = get_random_rect(state);
+    }
+}
+
+pub fn get_random_sub_rect(_canidate: Rect) -> Rect {
+    todo!()
+}
+pub fn get_random_rect(state: &mut GameState) -> Rect {
+    if state.rects.len() == 1 {
+        return state.rects[0];
+    }
+    let idx = random_i32(0, state.rects.len() as i32 - 1) as usize;
+    state.rects[idx]
+}
+
+
+pub fn add_subrects(state: &mut GameState, canidate: Rect) {
+    let w = i32::abs(canidate.w as i32 - canidate.x as i32);
+    let h = i32::abs(canidate.h as i32 - canidate.y as i32);
+    let half_w = i32::max(w / 2, 1);
+    let half_h = i32::max(h / 2, 1);
+    state.rects.push(Rect::new(
+        canidate.w,
+        canidate.h,
+        half_w as f32,
+        half_h as f32,
+    ));
+    state.rects.push(Rect::new(
+        canidate.w,
+        canidate.h + half_h as f32,
+        half_w as f32,
+        half_h as f32,
+    ));
+    state.rects.push(Rect::new(
+        canidate.w + half_w as f32,
+        canidate.h,
+        half_w as f32,
+        half_h as f32,
+    ));
+    state.rects.push(Rect::new(
+        canidate.w + half_w as f32,
+        canidate.h + half_h as f32,
+        half_w as f32,
+        half_h as f32,
+    ));
+}
 
 fn setup(c: &mut EngineContext) {
+    let _mobs: Vec<Mob> = Vec::new();
     // Load the grass texture
     c.load_texture_from_bytes(
         "grass",
         include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../assets/grass.png"
+        )),
+    );
+    c.load_texture_from_bytes(
+        "wall",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/wall.png"
+        )),
+    );
+    c.load_texture_from_bytes(
+        "floor",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/floor.png"
         )),
     );
 
@@ -23,6 +141,14 @@ fn setup(c: &mut EngineContext) {
             "/../assets/chicken.png"
         )),
     );
+    c.load_texture_from_bytes(
+        "mob",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/chicken.png"
+        )),
+    );
+
 
     for x in 0..50 {
         for y in 0..50 {
@@ -36,6 +162,35 @@ fn setup(c: &mut EngineContext) {
             ));
         }
     }
+
+    commands().spawn((
+        Transform::position(vec2(10.0, 25.0)),
+        Mob {
+            move_mode: Movement::Random,
+            position: vec2(10.0, 25.0),
+            velocity: Vec2::ZERO,
+            move_target: vec2(10.0, 25.0),
+            move_timer: 0.0,
+        },
+        AnimatedSpriteBuilder::new()
+            .z_index(10)
+            .add_animation("idle", 0.1, true, AnimationSource::Atlas {
+                name: "mob".into(),
+                offset: ivec2(0, 0),
+                step: ivec2(16, 0),
+                size: isplat(16),
+                frames: 1,
+            })
+            .add_animation("walk", 0.05, true, AnimationSource::Atlas {
+                name: "mob".into(),
+                offset: ivec2(16, 0),
+                step: ivec2(16, 0),
+                size: isplat(16),
+                frames: 6,
+            })
+            .build(),
+    ));
+
 
     // Spawn the player entity and make sure z-index is above the grass
     commands().spawn((
@@ -61,10 +216,107 @@ fn setup(c: &mut EngineContext) {
     ));
 }
 
+
 fn update(c: &mut EngineContext) {
     clear_background(TEAL);
 
     let dt = c.delta;
+    // for (mob,(_, transform)) in world().query::<(&mut Mob , &mut Transform)>().iter() {
+    //     let velocity = vec2(0., 0.1);
+    //     if velocity.length() > 0. {
+    //         move_timer += dt;
+    //     } else {
+    //        mob.move_timer = 0.;
+    //     }
+    //     if mob.move_timer > 1. {
+    //         mob.move_timer = 0.;
+    //         mob.move_target = vec2(random_i32(0, 50) as f32, random_i32(0, 50) as f32);
+    //     }
+    //     let mut move_dir = mob.move_target - mob.position;
+    //     if move_dir.length() > 0. {
+    //         move_dir = move_dir.normalize_or_zero();
+    //     }
+    //     mob.position += move_dir * 0.1 * dt;
+    //     mob.position.x = mob.position.x.clamp(0., 50.);
+    //     mob.position.y = mob.position.y.clamp(0., 50.);
+    //     mob.position = mob.position.round();
+    // }
+    for (_, (_, animated_sprite, transform, mode)) in world()
+        .query::<(&Mob, &mut AnimatedSprite, &mut Transform, &mut MoveMode)>()
+        .iter()
+    {
+        //TODO: turn system
+        let mut moved = false;
+        let speed = 3.0;
+        let mut move_dir = Vec2::ZERO;
+        match &mut mode.mode {
+            Movement::Static => {}
+            Movement::Random => {
+                let mut _move_roll = random_i32(1, 5);
+                match _move_roll {
+                    1 => {
+                        move_dir.x += 1.;
+                        moved = true;
+                        info!("move right");
+                    }
+                    2 => {
+                        move_dir.x -= 1.;
+                        moved = true;
+                        info!("move left");
+                    }
+                    3 => {
+                        move_dir.y += 1.;
+                        moved = true;
+                        info!("move up");
+                    }
+                    4 => {
+                        move_dir.y -= 1.;
+                        moved = true;
+                        info!("move down");
+                    }
+                    _ => (),
+                }
+            }
+
+            // if move_dir.x > 0.
+            //     && move_dir.x < 50.
+            //     && move_dir.y > 0.
+            //     && move_dir.y <50.
+            // {
+            //     let destination = map.xy_idx(move_dir.x as i32, move_dir.y as i32);
+
+            //     if !state.map.walls[destination] {
+            //         let idx = state
+            //             .map
+            //             .xy_idx(_transform.position.y as i32, _transform.position.y as i32);
+            //         state.map.walls[idx] = false;
+            //         _transform.position.x = move_dir.x;
+            //         _transform.position.y = move_dir.y;
+            //         state.map.walls[destination] = true;
+            //     }
+            // }
+            // }
+            Movement::RandomWaypoint { path } => {
+                if let Some(path) = path {
+                    if path.len() > 1 {
+                        transform.position.x = path[0] as f32 % 50.;
+                        transform.position.y = path[1] as f32 % 50.;
+                        path.remove(0);
+                    }
+                } else {
+                    mode.mode = Movement::RandomWaypoint { path: None };
+                }
+            }
+        }
+        if moved {
+            animated_sprite.flip_x = move_dir.x < 0.0;
+            transform.position += move_dir.normalize_or_zero() * speed * dt;
+            animated_sprite.play("walk");
+        } else {
+            animated_sprite.play("idle");
+        }
+    }
+
 
     for (_, (_, animated_sprite, transform)) in
         world().query::<(&Player, &mut AnimatedSprite, &mut Transform)>().iter()
