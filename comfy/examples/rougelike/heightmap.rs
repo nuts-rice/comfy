@@ -134,7 +134,7 @@ impl Heightmap {
     fn get_start_position(&self) -> Position {
         self.start
     }
-   pub fn build_map(&mut self) {
+    pub fn build_map(&mut self) {
         self.displace();
     }
     pub fn build_bsp_map(&mut self) {
@@ -162,26 +162,42 @@ impl Heightmap {
         while n_rooms < 240 {
             let rect = self.get_random_rect();
             let canidate = self.get_random_sub_rect(rect);
-            info!("canidate room has corners of : {:?} and {:?}", canidate.top_left, canidate.bottom_right);
+            info!(
+                "canidate room has corners of : {:?} and {:?}",
+                canidate.top_left, canidate.bottom_right
+            );
             if self.is_bsp_possible(canidate) {
                 apply_room_to_map(&canidate, self);
                 self.rooms.push(canidate);
                 self.add_subrects(rect);
             }
             n_rooms += 1;
-                    
-        } 
+        }
         self.rooms.sort_by(|a, b| a.top_left.x.cmp(&b.top_left.x));
-        for i in 0..self.rooms.len()  - 1 {
+        for i in 0..self.rooms.len() - 1 {
             let room = self.rooms[i];
             let next_room = self.rooms[i + 1];
-            let start_x = room.top_left.x + (random_i32(1, i32::abs(room.top_left.x - room.bottom_right.x)) - 1);
-            let start_y = room.top_left.y + (random_i32(1, i32::abs(room.top_left.y - room.bottom_right.y)) - 1);
-            let end_x = next_room.top_left.x + (random_i32(1, i32::abs(next_room.top_left.x - next_room.bottom_right.x)) - 1);
-            let end_y = next_room.top_left.y + (random_i32(1, i32::abs(next_room.top_left.y - next_room.bottom_right.y)) - 1);
+            let start_x = room.top_left.x +
+                (random_i32(
+                    1,
+                    i32::abs(room.top_left.x - room.bottom_right.x),
+                ) - 1);
+            let start_y = room.top_left.y +
+                (random_i32(
+                    1,
+                    i32::abs(room.top_left.y - room.bottom_right.y),
+                ) - 1);
+            let end_x = next_room.top_left.x +
+                (random_i32(
+                    1,
+                    i32::abs(next_room.top_left.x - next_room.bottom_right.x),
+                ) - 1);
+            let end_y = next_room.top_left.y +
+                (random_i32(
+                    1,
+                    i32::abs(next_room.top_left.y - next_room.bottom_right.y),
+                ) - 1);
             self.draw_corridor(start_x, start_y, end_x, end_y);
-                    
-
         }
         // let start = self.rooms[0].center();
         // self.start = Position {
@@ -190,7 +206,6 @@ impl Heightmap {
         //     color: YELLOW,
         //     tiletype: TileType::Floor,
         // };
-            
     }
 
     fn draw_corridor(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
@@ -208,7 +223,6 @@ impl Heightmap {
             }
             let idx = self.xy_idx(x, y);
             self.tiles[idx] = TileType::Floor;
-                    
         }
     }
 
@@ -216,14 +230,16 @@ impl Heightmap {
         if self.rects.len() == 1 {
             return self.rects[0];
         }
-        let idx = random_usize(1, self.rects.len()) - 1   as usize;
+        let idx = random_usize(1, self.rects.len()) - 1_usize;
         self.rects[idx]
     }
 
     fn get_random_sub_rect(&self, canidate: Rect) -> Rect {
         let mut result = canidate;
-        let rect_width = i32::abs(canidate.top_left.x - canidate.bottom_right.x);
-        let rect_height = i32::abs(canidate.top_left.y - canidate.bottom_right.y);
+        let rect_width =
+            i32::abs(canidate.top_left.x - canidate.bottom_right.x);
+        let rect_height =
+            i32::abs(canidate.top_left.y - canidate.bottom_right.y);
         let w = i32::max(3, random_i32(1, i32::min(rect_width, 10)) - 1) + 1;
         let h = i32::max(3, random_i32(1, i32::min(rect_height, 10)) - 1) + 1;
         result.top_left.x += random_i32(1, 6) - 1;
@@ -411,15 +427,15 @@ impl Heightmap {
             tiletype: TileType::Floor,
         };
     }
-    fn is_bsp_possible(&self, canidate: Rect)    -> bool {
+    fn is_bsp_possible(&self, canidate: Rect) -> bool {
         let mut expanded = canidate;
-        expanded.top_left.x -= (2) as i32;
-        expanded.bottom_right.x += (2) as i32;
-        expanded.top_left.y -= (2) as i32;
-        expanded.bottom_right.y += (2) as i32;
+        expanded.top_left.x -= 2_i32;
+        expanded.bottom_right.x += 2_i32;
+        expanded.top_left.y -= 2_i32;
+        expanded.bottom_right.y += 2_i32;
         let mut can_build = true;
-        for y in expanded.top_left.y ..= expanded.bottom_right.y {
-            for x in expanded.top_left.x ..= expanded.bottom_right.x {
+        for y in expanded.top_left.y..=expanded.bottom_right.y {
+            for x in expanded.top_left.x..=expanded.bottom_right.x {
                 if x > self.width - 2 {
                     can_build = false;
                 }
@@ -435,7 +451,7 @@ impl Heightmap {
                 if can_build {
                     let idx = self.xy_idx(x, y);
                     if self.tiles[idx] != TileType::Wall {
-                can_build = false;
+                        can_build = false;
                     }
                 }
             }
@@ -554,7 +570,7 @@ impl Heightmap {
         );
         let mut y = 0;
         let mut x = 0;
-        for (idx, tile) in self.tiles.iter().enumerate() {
+        for (_idx, tile) in self.tiles.iter().enumerate() {
             match tile {
                 TileType::Floor => {
                     commands().spawn((
@@ -570,23 +586,18 @@ impl Heightmap {
                 }
                 TileType::Wall => {
                     commands().spawn((
-                        Sprite::new(
-                            "wall".to_string(),
-                            vec2(1., 1.),
-                            0,
-                            WHITE,
-                        )
-                        .with_rect(x, y, 12, 12),
+                        Sprite::new("wall".to_string(), vec2(1., 1.), 0, WHITE)
+                            .with_rect(x, y, 12, 12),
                         Transform::position(vec2(x as f32, y as f32)),
-                        ));
-                }                     
-            }            
+                    ));
+                }
+            }
         }
         x += 1;
-        if x > MAPWIDTH as i32 - 1 { 
+        if x > MAPWIDTH - 1 {
             x = 0;
             y += 1;
-    }
+        }
 
         // for room in self.rooms.iter() {
         //     for x in room.top_left.x..=room.bottom_right.x {

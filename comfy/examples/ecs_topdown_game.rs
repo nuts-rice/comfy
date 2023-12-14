@@ -30,10 +30,25 @@ struct Mob {
 pub struct GameState {
     pub player: Player,
     pub mobs: Vec<Mob>,
+    pub map: Map,
     pub rooms: Vec<Rect>,
     pub rects: Vec<Rect>,
+    pub tiles: Vec<TileType>,
 }
 
+
+
+enum TileType {
+    Wall,
+    Floor,
+    Grass,
+}
+
+pub struct Map {
+    pub width: i32,
+    pub height: i32,
+    pub walls: Vec<bool>,
+}
 
 fn piss_off_mob(_state: &mut GameState, _new_target: &mut Vec2) {
     unimplemented!()
@@ -49,7 +64,11 @@ fn move_mobs(state: &mut GameState, time_delta: f32) {
         // piss_off_mob(state, &mut new_pos);
     }
 }
-fn gen_rooms(state: &mut GameState, _c: &mut EngineContext) {
+
+pub fn apply_room(state: &mut GameState, ) {
+
+}
+pub fn gen_rooms(state: &mut GameState, _c: &mut EngineContext) {
     state.rects.clear();
     state.rects.push(Rect::new(
         2.,
@@ -62,11 +81,53 @@ fn gen_rooms(state: &mut GameState, _c: &mut EngineContext) {
     let n_rooms = 0;
     while n_rooms < 15 {
         let _rect = get_random_rect(state);
+        let canidate = get_random_sub_rect(_rect);
+        if is_possible(state, canidate) {
+            
+            state.rooms.push(canidate);
+            add_subrects(state, canidate);
+        }
+            
+        
     }
 }
+pub fn is_possible(_state: &mut GameState, canidate: Rect) -> bool {
+    let mut expanded = canidate;
+    expanded.x -= 2.;
+    expanded.w += 2.;
+    expanded.y -= 2.;
+    expanded.h += 2.;
+    let mut possible = true;
+    for y in expanded.y as i32..expanded.h as i32 {
+        for x in expanded.x as i32..expanded.w as i32 {
+            if x > WORLD_WIDTH - 2 {possible = false;}
+            if y > WORLD_HEIGHT - 2 {possible = false;}
+            if x < 1 {possible = false;}
+            if y < 1 {possible = false;}
+            // if possible {
+            // let idx = ;
+            // if state.map.walls[idx] {
+                // possible = false;
+        // } 
+        }
+    }
+        possible
+}
 
+
+//TODO: evaluate if width and height are correct or need to switch around
 pub fn get_random_sub_rect(_canidate: Rect) -> Rect {
-    todo!()
+    let mut result = _canidate;
+    let rect_w = i32::abs(_canidate.x  as i32 - _canidate.w as i32);
+    let rect_h = i32::abs(_canidate.y  as i32 - _canidate.h as i32);
+    let w = i32::max(3, random_i32(1, i32::min(rect_w, 10)) -1) + 1;
+    let h = i32::max(3, random_i32(1, i32::min(rect_h, 10)) -1) + 1;
+    result.x += random_range(1., 6.) -1. ;
+    result.y += random_range(1., 6.) -1. ;
+    result.w = result.x + w as f32;
+    result.h = result.y + h as f32;
+    result
+
 }
 pub fn get_random_rect(state: &mut GameState) -> Rect {
     if state.rects.len() == 1 {
@@ -78,31 +139,31 @@ pub fn get_random_rect(state: &mut GameState) -> Rect {
 
 
 pub fn add_subrects(state: &mut GameState, canidate: Rect) {
-    let w = i32::abs(canidate.w as i32 - canidate.x as i32);
-    let h = i32::abs(canidate.h as i32 - canidate.y as i32);
+    let w = i32::abs(canidate.x as i32 - canidate.w as i32);
+    let h = i32::abs(canidate.y as i32 - canidate.h as i32);
     let half_w = i32::max(w / 2, 1);
     let half_h = i32::max(h / 2, 1);
     state.rects.push(Rect::new(
-        canidate.w,
-        canidate.h,
+        canidate.x,
+        canidate.y,
         half_w as f32,
         half_h as f32,
     ));
     state.rects.push(Rect::new(
-        canidate.w,
-        canidate.h + half_h as f32,
+        canidate.x,
+        canidate.y + half_h as f32,
         half_w as f32,
         half_h as f32,
     ));
     state.rects.push(Rect::new(
-        canidate.w + half_w as f32,
-        canidate.h,
+        canidate.x + half_w as f32,
+        canidate.y,
         half_w as f32,
         half_h as f32,
     ));
     state.rects.push(Rect::new(
-        canidate.w + half_w as f32,
-        canidate.h + half_h as f32,
+        canidate.x + half_w as f32,
+        canidate.y + half_h as f32,
         half_w as f32,
         half_h as f32,
     ));

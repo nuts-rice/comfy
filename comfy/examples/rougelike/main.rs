@@ -5,7 +5,7 @@ use comfy::*;
 
 
 pub use components::*;
-//TODO: use gamestate 
+//TODO: use gamestate
 pub struct GameState {
     pub map: Heightmap,
     pub player: Player,
@@ -27,7 +27,7 @@ pub fn load_assets(c: &mut EngineContext) {
         "wall",
         include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/wall.png")),
     );
-     c.load_texture_from_bytes(
+    c.load_texture_from_bytes(
         // Every texture gets a string name later used to reference it.
         "comfy",
         include_bytes!(concat!(
@@ -65,10 +65,12 @@ fn setup(_c: &mut EngineContext) {
     //TODO: use spawn_player later
     load_assets(_c);
     //need to pass down player
-    commands().spawn(( Sprite::new("comfy".to_string(), vec2(1.0, 1.0), 100, WHITE), Transform::position(vec2(map.start.x as f32, map.start.y as f32))));
+    commands().spawn((
+        Sprite::new("comfy".to_string(), vec2(1.0, 1.0), 100, WHITE),
+        Transform::position(vec2(map.start.x as f32, map.start.y as f32)),
+    ));
 }
 fn update(_c: &mut EngineContext) {
-    
     use MapSize::*;
     use Tileset::*;
     clear_background(GRAY);
@@ -98,7 +100,7 @@ fn update(_c: &mut EngineContext) {
                 map.draw_rooms_test();
             }
         });
-    let map_size = match *MAP_SIZE.borrow() {
+    let _map_size = match *MAP_SIZE.borrow() {
         Small => 3,
         Big => 7,
     };
@@ -135,9 +137,11 @@ fn update(_c: &mut EngineContext) {
                 dungeon_map.draw_rooms(_c);
             };
         });
-    //TODO: need to pass down player to comfy 
-    for (_, (_, _, transform)) in world().query::<(&Player, &Sprite, &mut Transform)>().iter() {
-         let mut moved = false;
+    //TODO: need to pass down player to comfy
+    for (_, (_, _, transform)) in
+        world().query::<(&Player, &Sprite, &mut Transform)>().iter()
+    {
+        let mut moved = false;
         let speed = 3.0;
         let mut move_dir = Vec2::ZERO;
 
@@ -163,7 +167,7 @@ fn update(_c: &mut EngineContext) {
             transform.position += move_dir.normalize_or_zero() * speed * dt;
         }
         main_camera_mut().center = transform.position;
-        
+
         //todo: query for mobs and entities and check for collisions
     }
 }

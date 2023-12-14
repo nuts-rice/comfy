@@ -57,11 +57,16 @@ pub struct Room {
     top_left: Position,
     bottom_right: Position,
 }
-pub fn spawn_room(map: &Heightmap, room: &Rect, world: &mut World, map_depth: i32) {
+pub fn spawn_room(
+    _map: &Heightmap,
+    _room: &Rect,
+    _world: &mut World,
+    _map_depth: i32,
+) {
     unimplemented!()
 }
 
-fn room_table(map_depth: i32) {
+fn room_table(_map_depth: i32) {
     unimplemented!()
 }
 impl Rect {
@@ -84,7 +89,7 @@ impl Rect {
     }
 }
 
-pub fn spawn_entities(map: &Heightmap, world: &mut World) {
+pub fn spawn_entities(_map: &Heightmap, _world: &mut World) {
     unimplemented!()
 }
 pub fn apply_room_to_map(room: &Rect, map: &mut Heightmap) {
@@ -186,8 +191,8 @@ impl Heightmap {
                         bottom_right,
                     );
                     let displace = rng_val * self.spread_rate;
-                    let t = (square_avg + displace);
-                    println!("t: {}", t as f32);
+                    let t = square_avg + displace;
+                    println!("t: {}", { t });
                     // let w = gen_range(t, MAX_SIZE as f32);
                     // let h = gen_range(t, MAX_SIZE as f32);
                     let canidate_room: Rect = Rect::new(
@@ -499,17 +504,16 @@ fn setup(_c: &mut EngineContext) {
     map.draw_heightmap();
 }
 fn update(_c: &mut EngineContext) {
-    use GenerativeMethod::*;
     use MapSize::*;
     use Tileset::*;
     clear_background(GRAY);
     let _viewport = main_camera().world_viewport();
     main_camera_mut().center = Vec2::from([2.0, 2.0]);
     main_camera_mut().zoom = 25.0;
-    let mut displaced = false;
+    let _displaced = false;
     const TIME: f32 = 3.0;
     let mut displaced = false;
-    let mut map = Heightmap::new(3, 0.44, "comfy");
+    let _map = Heightmap::new(3, 0.44, "comfy");
     egui::Window::new("Map size")
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(10.0, 10.0))
         .show(egui(), |ui| {
@@ -532,7 +536,7 @@ fn update(_c: &mut EngineContext) {
         Small => 3,
         Big => 7,
     };
-    let mut map = Heightmap::new(map_size, 0.44, "comfy");
+    let map = Heightmap::new(map_size, 0.44, "comfy");
     map.draw_rooms_test();
     // let mut map = Heightmap::new(map_size, 0.44, "comfy");
     // map.displace();
