@@ -9,7 +9,8 @@ pub struct CascadeCanvas {
 }
 
 struct Grass;
-
+struct ComfyBoid;
+pub const Z_BOIDS: i32 = 5;
 simple_game!("Mishka Shader", GameState, setup, update);
 
 pub struct GameState {
@@ -43,6 +44,14 @@ fn setup(_state: &mut GameState, _c: &mut EngineContext) {
             "/../assets/grass.png"
         )),
     );
+    _c.load_texture_from_bytes(
+        "comfy",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/comfy-surprise.png"
+        )),
+    );
+    
     // for x in 0..50 {
     //     for y in 0..50 {
     //         let variant = random_i32(0, 2);
@@ -164,7 +173,19 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     set_uniform_f32("intensity", state.intensity);
     set_uniform_f32("seed1", state.seed.get(0).unwrap().clone() as f32);
     set_uniform_f32("seed2", state.seed.get(1).unwrap().clone() as f32);
-    draw_comfy(vec2(6.0, 0.0), WHITE,5 , splat(1.0));
+    let count = 4;
+    for x in -count..count {
+        for y in -count..count {
+        commands().spawn((Transform::position(
+        vec2(10.0, 10.0) + vec2(x as f32, y as f32) + splat(0.5),
+                ),
+                Sprite::new("comfy", splat(1.0), 5, WHITE)
+                    
+                    .with_rect(0, 0, 16, 16),
+                // We tag these so that we can query them later.
+                ComfyBoid,)) 
+                    }
+    }
     
 
     if is_mouse_button_pressed(MouseButton::Left) {
