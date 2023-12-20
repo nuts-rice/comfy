@@ -1,6 +1,15 @@
 use comfy::*;
 use clap::Parser;
 use comfy_core::env_logger::Builder;
+pub static CASCADE_CANVAS: OnceCell<AtomicRefCell<CascadeCanvas>>  = OnceCell::new();
+
+pub struct CascadeCanvas {
+    width: i32,
+    height: i32,
+}
+
+struct Grass;
+
 simple_game!("Mishka Shader", GameState, setup, update);
 
 pub struct GameState {
@@ -27,7 +36,31 @@ impl GameState {
 }
 
 fn setup(_state: &mut GameState, _c: &mut EngineContext) {
+    _c.load_texture_from_bytes(
+        "grass",
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/grass.png"
+        )),
+    );
+    // for x in 0..50 {
+    //     for y in 0..50 {
+    //         let variant = random_i32(0, 2);
+    //         // Tile the world with random variant of grass sprite
+    //         commands().spawn((
+    //             Sprite::new("grass".to_string(), vec2(1.0, 1.0), 0, WHITE)
+    //                 .with_rect(32 * variant, 0, 32, 32),
+    //             Transform::position(vec2(x as f32, y as f32)),
+    //             Grass,
+    //         ));
+    //     }
+    // }
+
+
     
+
+
+
     game_config_mut().bloom_enabled = true;
     // let mut builder = Builder::new();
     // builder.filter()
@@ -50,7 +83,7 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
             // terminal, but will automatically fall back to the previous shader that compiled.
             create_reloadable_sprite_shader(
                 &mut c.renderer.shaders.borrow_mut(),
-                "my-shader",
+                "mishka-shader",
                 ReloadableShaderSource {
                     static_source: include_str!("funfun-shader.wgsl")
                         .to_string(),
@@ -85,7 +118,7 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     let shader_id = state.my_shader_id.unwrap();
 
     // First draw with a default shader.
-    draw_comfy(vec2(-2.0, 0.0), WHITE, 0, splat(1.0));
+    // draw_comfy(vec2(-2.0, 0.0), WHITE, 0, splat(1.0));
 
     egui::Window::new("Uniforms")
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, -100.0))
@@ -98,7 +131,7 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
         });
 
     // When we switch a shader the uniforms will get their default value
-    use_shader(shader_id);
+    // use_shader(shader_id);
 
     let time = get_time() as f32;
 
@@ -108,7 +141,7 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     set_uniform_f32("intensity", state.intensity);
     // set_uniform("seed", state.seed);
 
-    draw_comfy(vec2(0.0, 0.0), WHITE, 0, splat(1.0));
+    // draw_comfy(vec2(0.0, 0.0), WHITE, 0, splat(1.0));
 
     // This will set "intensity" while retaining "time" from the previous set in this frame, as
     // expected. None of this should be surprising, other than the fact that we can draw in between
@@ -120,18 +153,24 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     set_uniform_f32("intensity", state.intensity);
 
     // set_uniform_f32("pattern intensity", state.pattern_intensity);
-    draw_comfy(vec2(2.0, 0.0), WHITE, 0, splat(1.0));
+    // draw_comfy(vec2(2.0, 0.0), WHITE, 0, splat(1.0));
 
     // We can also easily switch back to the default sprite shader.
-    use_default_shader();
-    draw_comfy(vec2(4.0, 0.0), WHITE, 0, splat(1.0));
+    // use_default_shader();
+    // draw_comfy(vec2(4.0, 0.0), WHITE, 0, splat(1.0));
     use_shader(shader_id);
     let time = get_time() as f32;
     set_uniform_f32("time", time);
     set_uniform_f32("intensity", state.intensity);
     set_uniform_f32("seed1", state.seed.get(0).unwrap().clone() as f32);
     set_uniform_f32("seed2", state.seed.get(1).unwrap().clone() as f32);
-    draw_comfy(vec2(6.0, 0.0), WHITE, 0, splat(1.0));
+    draw_comfy(vec2(6.0, 0.0), WHITE,5 , splat(1.0));
+    
+
+    if is_mouse_button_pressed(MouseButton::Left) {
+        draw_circle(mouse_world(), 1., WHITE, 0);
+        
+    }
 
 }
 
