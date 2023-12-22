@@ -11,8 +11,9 @@ pub struct CascadeCanvas {
 
 struct Grass;
 struct ComfyBoid;
-pub const BOID_COUNT: i32 = 44;
+pub const BOID_COUNT: i32 = 88;
 pub const Z_BOIDS: i32 = 5;
+pub const MIN_DISTANCE: f32 = 8.;
 simple_game!("Mishka Shader", GameState, setup, update);
 
 pub struct GameState {
@@ -42,6 +43,7 @@ impl GameState {
 }
 
 fn setup(_state: &mut GameState, _c: &mut EngineContext) {
+    
     _c.load_texture_from_bytes(
         "grass",
         include_bytes!(concat!(
@@ -85,11 +87,11 @@ fn setup(_state: &mut GameState, _c: &mut EngineContext) {
         for x in 0..BOID_COUNT {
         for y in 0..BOID_COUNT {
         commands().spawn((Transform::position(
-        vec2(random_range(1., 20.), random_range(1., 20.)) + splat(0.5),
+        vec2(random() * 300. / 2.0 , random() * 300. / 2.0 ) + splat(0.5),
                 ),
                 Sprite::new("boid", splat(1.0), Z_BOIDS, WHITE)
                     
-                    .with_rect(0, 0, 16, 16),
+                   .with_rect(0, 0, 18, 18),
                 // We tag these so that we can query them later.
                 ComfyBoid,)) 
                     }     
@@ -224,8 +226,8 @@ srand(state.seed.get(0).unwrap().clone() as u64);
     move_dir.x = random_range(-1., 1.);
     move_dir.y = random_range(-1., 1.);
 
-    let vel_x =  random_range(1., 4.) * 0.1;
-    let vel_y  = random_range(1., 4.) * 0.1;   
+    let vel_x =  random_range(1., state.max_velocity) * 0.1;
+    let vel_y  = random_range(1., state.max_velocity) * 0.1;   
     let normalized = move_dir.normalize_or_zero();
     transform.position.x = transform.position.x + vel_x * normalized.x;
     transform.position.y = transform.position.y + vel_y * normalized.y;
@@ -233,6 +235,7 @@ srand(state.seed.get(0).unwrap().clone() as u64);
 
 
     }
+
     
 
     if is_mouse_button_pressed(MouseButton::Left) {
