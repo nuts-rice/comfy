@@ -1,8 +1,8 @@
-
-use comfy::*;
 use clap::Parser;
-use comfy_core::env_logger::Builder;
-pub static CASCADE_CANVAS: OnceCell<AtomicRefCell<CascadeCanvas>>  = OnceCell::new();
+use comfy::*;
+
+pub static CASCADE_CANVAS: OnceCell<AtomicRefCell<CascadeCanvas>> =
+    OnceCell::new();
 
 pub struct CascadeCanvas {
     width: i32,
@@ -20,30 +20,43 @@ pub struct GameState {
     pub my_shader_id: Option<ShaderId>,
     pub intensity: f32,
     pub pattern_intensity: f32,
-    alignment: f32,
-    cohesion: f32,
-    max_velocity: f32,
+    pub rules: Option<Rules>,
     pub seed: [u32; 2],
 }
 #[derive(Parser, Debug)]
 struct Args {
-#[arg(short = 's', long)]
-        _seed: Option<Vec<u32>>,
+    #[arg(short = 's', long)]
+    _seed: Option<Vec<u32>>,
+}
+
+pub struct Rules {
+    alignment: f32,
+    cohesion: f32,
+    max_velocity: f32,
 }
 
 pub fn gen_seed() -> [u32; 2] {
-    let rand_val : [u32; 2] = [rand(), rand()];
+    let rand_val: [u32; 2] = [rand(), rand()];
     rand_val
 }
 
 impl GameState {
     pub fn new(_c: &mut EngineState) -> Self {
-                    Self { my_shader_id: None, intensity: 2.0 , pattern_intensity: 2.0, seed: [111111, 22222] , alignment: 0.1, cohesion: 0.1, max_velocity: 5.0 }
+        Self {
+            my_shader_id: None,
+            intensity: 2.0,
+            pattern_intensity: 2.0,
+            seed: [111111, 22222],
+            rules: Some(Rules {
+                alignment: 0.1,
+                cohesion: 0.1,
+                max_velocity: 5.0,
+            }),
+        }
     }
 }
 
 fn setup(_state: &mut GameState, _c: &mut EngineContext) {
-    
     _c.load_texture_from_bytes(
         "grass",
         include_bytes!(concat!(
@@ -58,7 +71,7 @@ fn setup(_state: &mut GameState, _c: &mut EngineContext) {
             "/../assets/chicken.png"
         )),
     );
-    
+
     // for x in 0..50 {
     //     for y in 0..50 {
     //         let variant = random_i32(0, 2);
@@ -73,31 +86,27 @@ fn setup(_state: &mut GameState, _c: &mut EngineContext) {
     // }
 
 
-    
-
-
-
     game_config_mut().bloom_enabled = true;
     // let mut builder = Builder::new();
     // builder.filter()
-    let args = Args::parse();
+    let _args = Args::parse();
     let seed = gen_seed();
     _state.seed = seed;
     info!("shader demo with seed {:?}", _state.seed);
-        for x in 0..BOID_COUNT {
-        for y in 0..BOID_COUNT {
-        commands().spawn((Transform::position(
-        vec2(random() * 300. / 2.0 , random() * 300. / 2.0 ) + splat(0.5),
+    for _x in 0..BOID_COUNT {
+        for _y in 0..BOID_COUNT {
+            commands().spawn((
+                Transform::position(
+                    vec2(random() * 300. / 2.0, random() * 300. / 2.0) +
+                        splat(0.5),
                 ),
                 Sprite::new("boid", splat(1.0), Z_BOIDS, WHITE)
-                    
-                   .with_rect(0, 0, 18, 18),
+                    .with_rect(0, 0, 18, 18),
                 // We tag these so that we can query them later.
-                ComfyBoid,)) 
-                    }     
+                ComfyBoid,
+            ))
+        }
     }
-
-
 }
 
 fn update(state: &mut GameState, c: &mut EngineContext) {
@@ -140,7 +149,7 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
                     "seed1".to_string() => UniformDef::F32(Some(1.0)),
                     "seed2".to_string() => UniformDef::F32(Some(1.0)),
 
-                                    
+
                 },
             )
             .unwrap(),
@@ -149,6 +158,7 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
 
 
     let shader_id = state.my_shader_id.unwrap();
+    let rules = state.rules.as_mut().unwrap();
 
     // First draw with a default shader.
     // draw_comfy(vec2(-2.0, 0.0), WHITE, 0, splat(1.0));
@@ -161,12 +171,11 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
             ui.label("Pattern intensity");
             ui.add(egui::Slider::new(&mut state.intensity, 1.0..=5.0));
             ui.label("Alignment force");
-            ui.add(egui::Slider::new(&mut state.alignment, 0.0..=1.0));
+            ui.add(egui::Slider::new(&mut rules.alignment, 0.0..=1.0));
             ui.label("Cohesion force");
-            ui.add(egui::Slider::new(&mut state.cohesion, 0.0..=1.0));
+            ui.add(egui::Slider::new(&mut rules.cohesion, 0.0..=1.0));
             ui.label("Max velocity");
-            ui.add(egui::Slider::new(&mut state.max_velocity, 0.0..=7.));
-
+            ui.add(egui::Slider::new(&mut rules.max_velocity, 0.0..=7.));
         });
 
     // When we switch a shader the uniforms will get their default value
@@ -201,50 +210,50 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     let time = get_time() as f32;
     set_uniform_f32("time", time);
     set_uniform_f32("intensity", state.intensity);
-    set_uniform_f32("seed1", state.seed.get(0).unwrap().clone() as f32);
-    set_uniform_f32("seed2", state.seed.get(1).unwrap().clone() as f32);
-    set_uniform_f32("alignment", state.alignment);
-    set_uniform_f32("cohesion", state.cohesion);
-    set_uniform_f32("max_velocity", state.max_velocity);
+    set_uniform_f32("seed1", *state.seed.first().unwrap() as f32);
+    set_uniform_f32("seed2", *state.seed.get(1).unwrap() as f32);
+    set_uniform_f32("alignment", rules.alignment);
+    set_uniform_f32("cohesion", rules.cohesion);
+    set_uniform_f32("max_velocity", rules.max_velocity);
 
-srand(state.seed.get(0).unwrap().clone() as u64);
-   
+    srand(*state.seed.first().unwrap() as u64);
+
     // for x in 0..BOID_COUNT {
     //     for y in 0..BOID_COUNT {
     //     commands().spawn((Transform::position(
     //     vec2(random_range(1., 20.), random_range(1., 20.)) + splat(0.5),
     //             ),
     //             Sprite::new("comfy", splat(1.0), Z_BOIDS, WHITE)
-                    
+
     //                 .with_rect(0, 0, 16, 16),
     //             // We tag these so that we can query them later.
-    //             ComfyBoid,)) 
-    //                 }     
+    //             ComfyBoid,))
+    //                 }
     // }
-    for (_, (_, sprite, transform)) in world().query::<(&ComfyBoid, &mut Sprite, &mut Transform)>().iter(){
-    let mut move_dir = Vec2::ZERO;
-    move_dir.x = random_range(-1., 1.);
-    move_dir.y = random_range(-1., 1.);
+    for (_, (_, _sprite, transform)) in
+        world().query::<(&ComfyBoid, &mut Sprite, &mut Transform)>().iter()
+    {
+        let mut move_dir = Vec2::ZERO;
+        move_dir.x = random_range(-1., 1.);
+        move_dir.y = random_range(-1., 1.);
 
-    let vel_x =  random_range(1., state.max_velocity) * 0.1;
-    let vel_y  = random_range(1., state.max_velocity) * 0.1;   
-    let normalized = move_dir.normalize_or_zero();
-    transform.position.x = transform.position.x + vel_x * normalized.x;
-    transform.position.y = transform.position.y + vel_y * normalized.y;
-    
-
-
+        let vel_x = random_range(1., rules.max_velocity) * 0.1;
+        let vel_y = random_range(1., rules.max_velocity) * 0.1;
+        let normalized = move_dir.normalize_or_zero();
+        transform.position.x += vel_x * normalized.x;
+        transform.position.y += vel_y * normalized.y;
     }
 
-    
 
     if is_mouse_button_pressed(MouseButton::Left) {
         draw_circle(mouse_world(), 1., WHITE, 0);
-        
     }
-
 }
-
+impl Rules {
+    pub fn new(alignment: f32, cohesion: f32, max_velocity: f32) -> Self {
+        Self { alignment, cohesion, max_velocity }
+    }
+}
 //experment with 2.5d
 // fn draw_room(pos: Vec2) {
 //     let pos = pos.extend(0.0);

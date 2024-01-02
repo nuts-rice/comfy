@@ -57,7 +57,12 @@ pub struct Room {
     top_left: Position,
     bottom_right: Position,
 }
-pub fn spawn_room(map: &Heightmap, room: &Rect, world: &mut World, map_depth: i32) {
+pub fn spawn_room(
+    map: &Heightmap,
+    room: &Rect,
+    world: &mut World,
+    map_depth: i32,
+) {
     unimplemented!()
 }
 
