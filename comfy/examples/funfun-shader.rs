@@ -10,8 +10,13 @@ pub struct CascadeCanvas {
 }
 
 struct Grass;
-struct ComfyBoid;
-pub const BOID_COUNT: i32 = 88;
+struct ComfyBoid {
+    behavior: BoidBehavior,
+    neighbor_distance: f32,
+    num_neighbors: i32,
+    neighbors: Vec<Entity>,
+}
+pub const BOID_COUNT: i32 = 55;
 pub const Z_BOIDS: i32 = 5;
 pub const MIN_DISTANCE: f32 = 8.;
 simple_game!("Mishka Shader", GameState, setup, update);
@@ -34,7 +39,11 @@ pub struct Rules {
     cohesion: f32,
     max_velocity: f32,
 }
-
+enum BoidBehavior {
+    Flocking,
+    Chasing,
+    Fleeing,
+}
 pub fn gen_seed() -> [u32; 2] {
     let rand_val: [u32; 2] = [rand(), rand()];
     rand_val
@@ -44,19 +53,20 @@ impl GameState {
     pub fn new(_c: &mut EngineState) -> Self {
         Self {
             my_shader_id: None,
-            intensity: 2.0,
-            pattern_intensity: 2.0,
+            intensity: 1.0,
+            pattern_intensity: 1.0,
             seed: [111111, 22222],
             rules: Some(Rules {
-                alignment: 0.1,
-                cohesion: 0.1,
-                max_velocity: 5.0,
+                alignment: 0.0,
+                cohesion: 0.0,
+                max_velocity: 0.0,
             }),
         }
     }
 }
 
 fn setup(_state: &mut GameState, _c: &mut EngineContext) {
+    use BoidBehavior::*;
     _c.load_texture_from_bytes(
         "grass",
         include_bytes!(concat!(
@@ -103,12 +113,36 @@ fn setup(_state: &mut GameState, _c: &mut EngineContext) {
                 Sprite::new("boid", splat(1.0), Z_BOIDS, WHITE)
                     .with_rect(0, 0, 18, 18),
                 // We tag these so that we can query them later.
-                ComfyBoid,
-            ))
+                ComfyBoid {
+                    behavior: Flocking,
+                    neighbor_distance: 2.,
+                    neighbors: Vec::new(),
+                    num_neighbors: 0,
+                                    
+                },
+                AnimatedSpriteBuilder::new()
+                    .add_animation("idle", 0.1, true, AnimationSource::Atlas {
+                        name: "boid".into(),
+                        offset: ivec2(0, 0),
+                        step: ivec2(16, 0),
+                        size: isplat(16),
+                        frames: 1,
+                    })
+                    .add_animation("walk", 0.05, true, AnimationSource::Atlas {
+                        name: "boid".into(),
+                        offset: ivec2(16, 0),
+                        step: ivec2(16, 0),
+                        size: isplat(16),
+                        frames: 6,
+                    })
+                    .build(),
+            ));
         }
     }
 }
-
+pub fn add_vec2(a: Vec2, b: Vec2) -> Vec2 {
+    Vec2 { x: a.x + b.x, y: a.y + b.y }
+}
 fn update(state: &mut GameState, c: &mut EngineContext) {
     if state.my_shader_id.is_none() {
         state.my_shader_id = Some(
@@ -230,23 +264,107 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     //             ComfyBoid,))
     //                 }
     // }
-    for (_, (_, _sprite, transform)) in
-        world().query::<(&ComfyBoid, &mut Sprite, &mut Transform)>().iter()
-    {
-        let mut move_dir = Vec2::ZERO;
-        move_dir.x = random_range(-1., 1.);
-        move_dir.y = random_range(-1., 1.);
+    let mut avg_close_pos = Vec2::ZERO;
+    let mut avg_move_dir = Vec2::ZERO;
+    let mut boid_pos = Vec2::ZERO;
 
+    for (_, (_, sprite, transform)) in &mut world()
+        .query::<(&ComfyBoid, &mut AnimatedSprite, &mut Transform)>()
+        .iter()
+    {
+        boid_pos = transform.position;
+        let mut moved = false;
+        // let neighbors: HashMap<Entity, &Transform> = world().query::<&Transform>().iter().filter(|(_, t)| 
+        //     t.position.distance(transform.position) < rules.cohesion && t.position != transform.position)
+        //     .map(|(e, t)| (e, t)).collect();
+        // let distance_from_neighbors = transform.position.distance(neighbors);
+        // let neighbors = get_neighbors(transform.position, rules.cohesion);
+        avg_move_dir.x = random_range(-1., 1.);
+        avg_move_dir.y = random_range(-1., 1.);
         let vel_x = random_range(1., rules.max_velocity) * 0.1;
         let vel_y = random_range(1., rules.max_velocity) * 0.1;
-        let normalized = move_dir.normalize_or_zero();
+        let normalized = avg_move_dir.normalize_or_zero();
         transform.position.x += vel_x * normalized.x;
         transform.position.y += vel_y * normalized.y;
+        // let neighbors = world().query::<&Position>().iter().filter(|(_, t)| 
+        //     t.distance(boid_pos) < rules.cohesion && t != &boid_pos)
+        //     .map(|(e, t)| (e, t)).collect();
+        // if distance_from_neighbors < rules.cohesion {
+        //     avg_close_pos = add_vec2(avg_close_pos, boid_pos);
+        //     transform.position += avg_close_pos / neighbors as f32;
+        // }
+         
+
+         
+
+
+        moved = true;
+        if moved {
+            sprite.flip_x = vel_x < 0.;
+            sprite.play("walk");
+        } else {
+            sprite.play("idle");
+        }
     }
+    for (_, (transform, boid)) in world().query::<(&mut Transform, &mut ComfyBoid)>().iter() {
+        if transform.position.distance(boid_pos) < rules.cohesion {
+            info!("inside cohesion distance");
+            avg_close_pos = add_vec2(avg_close_pos, boid_pos);
+            let normalized = avg_close_pos.normalize_or_zero();
+            boid.num_neighbors += 1;                                         
+        } else {
+                info!("outside cohesion distance");
+                let distance = transform.position.distance(boid_pos);
+                info!("distance {:?}", distance);
+                avg_close_pos = add_vec2(avg_close_pos, boid_pos);
+                let normalized = avg_close_pos.normalize_or_zero();
+                info!("normalized avg_close_pos {:?}", normalized);
+                transform.position.x += normalized.x;
+                transform.position.y += normalized.y;
+                // transform.position += avg_close_pos;
+            }
+    }
+            // avg_close_pos = add_vec2(avg_close_pos, transform.position);
+            // transform.position += avg_close_pos ;
+                    
+    
+    // }
+    // for (boid_idx, (_, transform)) in
+    //     world().query::<(&ComfyBoid, &mut Transform)>().iter()
+    // {
+    //     let mut avg_pos = Vec2::ZERO;
+    //     let mut avg_move_dir = Vec2::ZERO;
+    //     let mut avg_close_pos = Vec2::ZERO;
+    //     let mut neighbors = 0;
+
+
+    //     let other_pos = transform.position;
+    //     let distance = transform.position.distance(other_pos);
+    //     if distance < rules.cohesion {
+    //         avg_close_pos = add_vec2(avg_close_pos, other_pos);
+    //         neighbors += 1;
+    //     }
+    //     avg_pos = add_vec2(avg_pos, other_pos);
+
+    //     // avg_move_dir += ;
+    // }
 
 
     if is_mouse_button_pressed(MouseButton::Left) {
         draw_circle(mouse_world(), 1., WHITE, 0);
+    }
+    fn get_neighbors(pos: Vec2, radius: f32, ) -> Vec<Entity> {
+        let mut neighbors = Vec::new();
+        for (idx, (_, transform)) in
+            world().query::<(&ComfyBoid, &mut Transform)>().iter()
+        {
+            let other_pos = transform.position;
+            let distance = pos.distance(other_pos);
+            if distance < radius {
+                neighbors.push(idx);
+            }
+        }
+        neighbors
     }
 }
 impl Rules {
