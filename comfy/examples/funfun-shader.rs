@@ -16,7 +16,7 @@ struct ComfyBoid {
     num_neighbors: i32,
     neighbors: Vec<Entity>,
 }
-pub const BOID_COUNT: i32 = 55;
+pub const BOID_COUNT: i32 = 66;
 pub const Z_BOIDS: i32 = 5;
 pub const MIN_DISTANCE: f32 = 8.;
 simple_game!("Mishka Shader", GameState, setup, update);
@@ -267,9 +267,12 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
     let mut avg_close_pos = Vec2::ZERO;
     let mut avg_move_dir = Vec2::ZERO;
     let mut boid_pos = Vec2::ZERO;
+    let mut coshesion_x = 0;
+    let mut cohesion_y = 0;
+    let mut neighbors = 0;
 
-    for (_, (_, sprite, transform)) in &mut world()
-        .query::<(&ComfyBoid, &mut AnimatedSprite, &mut Transform)>()
+    for (_, (boid, sprite, transform)) in &mut world()
+        .query::<(&mut ComfyBoid, &mut AnimatedSprite, &mut Transform)>()
         .iter()
     {
         boid_pos = transform.position;
@@ -281,11 +284,53 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
         // let neighbors = get_neighbors(transform.position, rules.cohesion);
         avg_move_dir.x = random_range(-1., 1.);
         avg_move_dir.y = random_range(-1., 1.);
-        let vel_x = random_range(1., rules.max_velocity) * 0.1;
-        let vel_y = random_range(1., rules.max_velocity) * 0.1;
-        let normalized = avg_move_dir.normalize_or_zero();
-        transform.position.x += vel_x * normalized.x;
-        transform.position.y += vel_y * normalized.y;
+        let vel_x = random_range(1., rules.max_velocity) * 0.05;
+        let vel_y = random_range(1., rules.max_velocity) * 0.05;
+        let normalized = avg_move_dir.normalize_or_right();
+        transform.position.x += vel_x * normalized.x ;
+        transform.position.y += vel_y * normalized.y ;
+        if transform.position.distance(boid_pos) < rules.cohesion  && transform.position != boid_pos {
+            info!("inside cohesion distance");
+            coshesion_x += boid_pos.x as i32;
+            cohesion_y += boid_pos.y as i32;
+            // avg_close_pos = add_vec2(avg_close_pos, boid_pos);
+            // let normalized = avg_close_pos.normalize_or_zero();
+            boid.num_neighbors += 1;
+            neighbors += 1;
+        }     
+        // } else  {
+        if (neighbors > 0) {
+                info!("outside cohesion distance");
+                let cohesion_radius = random_range(1., rules.cohesion);
+                let distance = transform.position.distance(boid_pos);
+                info!("distance {:?}", distance);
+                coshesion_x = coshesion_x / neighbors;
+                cohesion_y = cohesion_y / neighbors;
+                avg_close_pos=  Vec2 {x: transform.position.x - boid_pos.x * rules.cohesion, y: transform.position.y - boid_pos.y * rules.cohesion};
+
+                let normalized = avg_close_pos.normalize_or_right();
+                info!("normalized avg_close_pos {:?}", normalized);
+                let vel_x = random_range(1., rules.max_velocity) * 0.05;
+                let vel_y = random_range(1., rules.max_velocity) * 0.05;
+                transform.position.x += vel_x *  normalized.x - 1. 
+                    ;
+                transform.position.y += vel_y * normalized.y - 1. ;
+        }
+        if transform.position.x  >= 300.{
+            transform.position.x = 20.;
+
+        }
+        if transform.position.y  >= 300.{
+            transform.position.y = 20.;
+        }
+        if transform.position.x  <= -300.{
+            transform.position.x = 20.;
+
+        }
+        if transform.position.y  <= -300.{
+            transform.position.y = 20.;
+        }
+
         // let neighbors = world().query::<&Position>().iter().filter(|(_, t)| 
         //     t.distance(boid_pos) < rules.cohesion && t != &boid_pos)
         //     .map(|(e, t)| (e, t)).collect();
@@ -306,24 +351,24 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
             sprite.play("idle");
         }
     }
-    for (_, (transform, boid)) in world().query::<(&mut Transform, &mut ComfyBoid)>().iter() {
-        if transform.position.distance(boid_pos) < rules.cohesion {
-            info!("inside cohesion distance");
-            avg_close_pos = add_vec2(avg_close_pos, boid_pos);
-            let normalized = avg_close_pos.normalize_or_zero();
-            boid.num_neighbors += 1;                                         
-        } else {
-                info!("outside cohesion distance");
-                let distance = transform.position.distance(boid_pos);
-                info!("distance {:?}", distance);
-                avg_close_pos = add_vec2(avg_close_pos, boid_pos);
-                let normalized = avg_close_pos.normalize_or_zero();
-                info!("normalized avg_close_pos {:?}", normalized);
-                transform.position.x += normalized.x;
-                transform.position.y += normalized.y;
-                // transform.position += avg_close_pos;
-            }
-    }
+    // for (_, (transform, boid)) in world().query::<(&mut Transform, &mut ComfyBoid)>().iter() {
+    //     if transform.position.distance(boid_pos) < rules.cohesion {
+    //         info!("inside cohesion distance");
+    //         avg_close_pos = add_vec2(avg_close_pos, boid_pos);
+    //         let normalized = avg_close_pos.normalize_or_zero();
+    //         boid.num_neighbors += 1;                                         
+    //     } else if rules.cohesion > 0.2 {
+    //             info!("outside cohesion distance");
+    //             let distance = transform.position.distance(boid_pos);
+    //             info!("distance {:?}", distance);
+    //             avg_close_pos = add_vec2(avg_close_pos, boid_pos);
+    //             let normalized = avg_close_pos.normalize_or_right();
+    //             info!("normalized avg_close_pos {:?}", normalized);
+    //             transform.position.x += normalized.x - 1.;
+    //             transform.position.y += normalized.y - 1.;
+    //             // transform.position += avg_close_pos;
+    //         }
+    // }
             // avg_close_pos = add_vec2(avg_close_pos, transform.position);
             // transform.position += avg_close_pos ;
                     
@@ -366,6 +411,10 @@ fn update(state: &mut GameState, c: &mut EngineContext) {
         }
         neighbors
     }
+}
+
+pub fn wrap_window() {
+    todo!()
 }
 impl Rules {
     pub fn new(alignment: f32, cohesion: f32, max_velocity: f32) -> Self {
